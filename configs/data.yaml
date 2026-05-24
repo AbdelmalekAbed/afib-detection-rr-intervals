@@ -1,0 +1,39 @@
+datasets:
+  afdb:
+    physionet_id: afdb
+    enabled: true
+    role: train_val
+  nsrdb:
+    physionet_id: nsrdb
+    enabled: true
+    role: negatives
+  ltafdb:
+    physionet_id: ltafdb
+    enabled: true
+    role: external_test
+  cinc2017:
+    physionet_id: challenge-2017/1.0.0
+    enabled: false
+    role: external_test_short
+
+paths:
+  raw_dir: data/raw
+  processed_dir: data/processed
+
+windowing:
+  window_size: 30
+  stride: 15
+  label_strategy: majority
+
+preprocessing:
+  remove_ectopic: true
+  ectopic_threshold: 0.20
+  normalize: zscore_per_window
+  clip_rr_seconds:
+    min: 0.3
+    max: 2.0
+
+split:
+  scheme: patient_kfold
+  n_folds: 5
+  seed: 42

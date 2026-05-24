@@ -1,0 +1,32 @@
+defaults:
+  data: configs/data.yaml
+  model: configs/model_cnn_lstm.yaml
+
+training:
+  seed: 42
+  epochs: 20
+  batch_size: 256
+  optimizer:
+    name: adamw
+    lr: 1.0e-3
+    weight_decay: 1.0e-4
+  scheduler:
+    name: cosine
+    warmup_epochs: 1
+  loss:
+    name: bce_with_logits
+    class_weighted: true
+  early_stopping:
+    monitor: val_f1
+    patience: 5
+    mode: max
+
+evaluation:
+  threshold_search: true
+  metrics: [f1, auroc, auprc, sensitivity, specificity, accuracy]
+  per_patient_report: true
+
+logging:
+  out_dir: artifacts
+  experiment_name: cnn_lstm_baseline
+  save_best_only: true

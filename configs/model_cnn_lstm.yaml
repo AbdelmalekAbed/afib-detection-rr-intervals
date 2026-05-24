@@ -1,0 +1,25 @@
+model:
+  name: cnn_lstm
+  input_length: 30
+
+  cnn:
+    n_blocks: 2
+    channels: [16, 32]
+    kernel_size: 5
+    pool_size: 2
+    dropout: 0.2
+    batch_norm: true
+
+  lstm:
+    hidden_size: 32
+    num_layers: 1
+    bidirectional: true
+    dropout: 0.2
+
+  head:
+    pooling: global_avg
+    hidden: 32
+    dropout: 0.3
+
+  out_classes: 1
+  parameter_budget: 100000
