@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from src.data.loader import list_records, load_record
+from src.data.loader import list_records, load_record_metadata
 from src.data.rr_extract import clean_rr_series, extract_rr_series
 from src.data.windowing import build_windowed_dataset
 
@@ -43,8 +43,8 @@ def main() -> None:
         series_by_patient = {}
         for rec_name in list_records(dataset_dir):
             try:
-                record, ann = load_record(dataset_dir, rec_name)
-                series = extract_rr_series(record, ann)
+                meta = load_record_metadata(dataset_dir, rec_name)
+                series = extract_rr_series(meta)
                 series = clean_rr_series(series, min_rr=min_rr, max_rr=max_rr)
                 if len(series.rr_seconds) >= window_size:
                     series_by_patient[rec_name] = series

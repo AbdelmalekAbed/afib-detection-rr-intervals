@@ -7,6 +7,9 @@ from src.data.rr_extract import RRSeries
 from src.data.windowing import segment_record
 from src.features.hrv import feature_vector
 
+# Smoke test of the loader/extract chain on a real PhysioNet record is skipped
+# if the data has not been downloaded yet — keeps unit tests pure.
+
 
 def make_series(n: int, afib_fraction: float, seed: int = 0) -> RRSeries:
     rng = np.random.default_rng(seed)
