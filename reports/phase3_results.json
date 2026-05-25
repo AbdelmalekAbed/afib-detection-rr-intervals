@@ -1,0 +1,92 @@
+{
+  "best_params": {
+    "n_cnn_blocks": 3,
+    "cnn_first": 24,
+    "kernel_size": 7,
+    "cnn_dropout": 0.10382179541833388,
+    "lstm_hidden": 48,
+    "lstm_layers": 1,
+    "head_hidden": 32,
+    "head_dropout": 0.49795880412672494,
+    "lr": 0.0029455020948035288
+  },
+  "best_param_count": 100193,
+  "cnn_lstm_metrics": {
+    "auroc": 0.9548319100869588,
+    "auprc": 0.9375439534371982,
+    "threshold": 0.5,
+    "f1": 0.8737296091209643,
+    "sensitivity": 0.9079855219997738,
+    "specificity": 0.8686899496721061,
+    "accuracy": 0.8857905811993158,
+    "mean_patient_f1": 0.6639031544762224,
+    "n_patients_scored": 23
+  },
+  "ablation": {
+    "cnn_lstm_full": {
+      "label": "CNN-LSTM (full)",
+      "auroc": 0.9548664326094352,
+      "auprc": 0.9362887376184424,
+      "threshold": 0.5,
+      "f1": 0.8747905195116112,
+      "sensitivity": 0.9299287410926366,
+      "specificity": 0.8488855966360923,
+      "accuracy": 0.8841539199881865,
+      "mean_patient_f1": 0.6551582804800484,
+      "n_patients_scored": 23,
+      "n_params": 100193
+    },
+    "no_cnn": {
+      "label": "Sans CNN",
+      "auroc": 0.9490620230150364,
+      "auprc": 0.9286342176154131,
+      "threshold": 0.5,
+      "f1": 0.8682592019379585,
+      "sensitivity": 0.9121705689401651,
+      "specificity": 0.854397699296281,
+      "accuracy": 0.8795392737162054,
+      "mean_patient_f1": 0.6511178031016055,
+      "n_patients_scored": 23,
+      "n_params": 19681
+    },
+    "no_lstm": {
+      "label": "Sans LSTM",
+      "auroc": 0.9529918265556139,
+      "auprc": 0.9349847947766126,
+      "threshold": 0.5,
+      "f1": 0.8715927311598076,
+      "sensitivity": 0.9222655808166497,
+      "specificity": 0.8505196191638162,
+      "accuracy": 0.8817419982033644,
+      "mean_patient_f1": 0.6502000552625742,
+      "n_patients_scored": 23,
+      "n_params": 41089
+    },
+    "unidir": {
+      "label": "LSTM unidir.",
+      "auroc": 0.9543597765801115,
+      "auprc": 0.9348576454478161,
+      "threshold": 0.5,
+      "f1": 0.8729368335789879,
+      "sensitivity": 0.9294763035855672,
+      "specificity": 0.845857208218044,
+      "accuracy": 0.8822465328624343,
+      "mean_patient_f1": 0.6595112163938591,
+      "n_patients_scored": 23,
+      "n_params": 70625
+    },
+    "window60": {
+      "label": "Fen\u00eatre = 60 RR",
+      "auroc": 0.9767321791043645,
+      "auprc": 0.9660418397341839,
+      "threshold": 0.5,
+      "f1": 0.9132817448296753,
+      "sensitivity": 0.937524735681574,
+      "specificity": 0.9108435837040915,
+      "accuracy": 0.9224632506832787,
+      "mean_patient_f1": 0.731998658736043,
+      "n_patients_scored": 23,
+      "n_params": 100193
+    }
+  }
+}
