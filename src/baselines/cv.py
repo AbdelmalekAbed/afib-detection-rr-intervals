@@ -73,8 +73,16 @@ def _train_one_torch_fold(
     patience: int,
     pos_weight: float | None,
     seed: int,
+    weight_decay: float = 0.0,
+    early_stop_metric: str = "loss",
 ) -> np.ndarray:
-    """Train a torch model with BCE-with-logits + early stopping on val loss."""
+    """Train a torch model with BCE-with-logits + early stopping.
+
+    ``early_stop_metric`` selects what to monitor on the validation fold:
+    ``"loss"`` (default, lower-is-better) or ``"auroc"`` (higher-is-better).
+    AUROC is smoother than loss when ``pos_weight`` is large, which matters
+    when the loss curve is too noisy to early-stop reliably.
+    """
     torch.manual_seed(seed)
 
     Xt = torch.from_numpy(X_tr).float()
@@ -83,12 +91,14 @@ def _train_one_torch_fold(
     yv = torch.from_numpy(y_va.astype(np.float32))
 
     loader = DataLoader(TensorDataset(Xt, yt), batch_size=batch_size, shuffle=True)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr)
+    optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     pw = torch.tensor([pos_weight], dtype=torch.float32) if pos_weight else None
     crit = nn.BCEWithLogitsLoss(pos_weight=pw)
 
-    best_loss = float("inf")
+    if early_stop_metric not in {"loss", "auroc"}:
+        raise ValueError(f"unknown early_stop_metric: {early_stop_metric}")
+    best_metric = float("inf") if early_stop_metric == "loss" else -float("inf")
     best_scores: np.ndarray | None = None
     bad = 0
     for _ in range(epochs):
@@ -105,8 +115,19 @@ def _train_one_torch_fold(
             val_logits = model(Xv)
             val_loss = float(crit(val_logits, yv).item())
             scores = torch.sigmoid(val_logits).cpu().numpy()
-        if val_loss < best_loss - 1e-4:
-            best_loss = val_loss
+
+        if early_stop_metric == "loss":
+            current = val_loss
+            improved = current < best_metric - 1e-4
+        else:
+            try:
+                current = float(roc_auc_score(y_va, scores))
+            except ValueError:
+                current = -float("inf")
+            improved = current > best_metric + 1e-4
+
+        if improved:
+            best_metric = current
             best_scores = scores
             bad = 0
         else:
@@ -194,6 +215,8 @@ def crossval_torch_oof(
     patience: int = 3,
     use_pos_weight: bool = True,
     seed: int = 42,
+    weight_decay: float = 0.0,
+    early_stop_metric: str = "loss",
 ) -> OOFResult:
     """OOF sigmoid scores from a torch baseline trained one fold at a time."""
     Xn = zscore_per_window(X)
@@ -216,6 +239,8 @@ def crossval_torch_oof(
             patience=patience,
             pos_weight=pw,
             seed=seed + k,
+            weight_decay=weight_decay,
+            early_stop_metric=early_stop_metric,
         )
         y_score[va] = scores
         fold[va] = k

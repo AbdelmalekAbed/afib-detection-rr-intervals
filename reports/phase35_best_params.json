@@ -1,0 +1,12 @@
+{
+  "n_cnn_blocks": 3,
+  "cnn_first": 16,
+  "kernel_size": 5,
+  "cnn_dropout": 0.20027968126905468,
+  "lstm_hidden": 16,
+  "lstm_layers": 2,
+  "head_hidden": 16,
+  "head_dropout": 0.4024646756450459,
+  "lr": 0.001649184589567592,
+  "weight_decay": 0.0015862776574507062
+}

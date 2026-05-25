@@ -1,0 +1,5 @@
+model,auroc,auprc,f1,sensitivity,specificity,mean_patient_f1
+HRV + RF (Phase 2),0.9863,0.9795,0.9316,0.9361,0.9434,0.8459
+CNN-LSTM w=30 (Phase 3 best),0.9548,0.9375,0.8737,0.908,0.8687,0.6639
+CNN-LSTM w=60 (Phase 3 default),0.9767,0.966,0.9133,0.9375,0.9108,0.732
+CNN-LSTM w=60 (Phase 3.5 reg.),0.9722,0.9574,0.8946,0.9617,0.8548,0.7052

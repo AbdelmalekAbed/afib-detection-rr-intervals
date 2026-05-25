@@ -1,0 +1,26 @@
+{
+  "best_params": {
+    "n_cnn_blocks": 3,
+    "cnn_first": 16,
+    "kernel_size": 5,
+    "cnn_dropout": 0.20027968126905468,
+    "lstm_hidden": 16,
+    "lstm_layers": 2,
+    "head_hidden": 16,
+    "head_dropout": 0.4024646756450459,
+    "lr": 0.001649184589567592,
+    "weight_decay": 0.0015862776574507062
+  },
+  "best_param_count": 30657,
+  "metrics": {
+    "auroc": 0.9721964379178307,
+    "auprc": 0.9573883817378679,
+    "threshold": 0.5,
+    "f1": 0.8946275015120835,
+    "sensitivity": 0.9617232995985753,
+    "specificity": 0.8547500654278984,
+    "accuracy": 0.9013370103168936,
+    "mean_patient_f1": 0.7051975857470919,
+    "n_patients_scored": 23
+  }
+}
