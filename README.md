@@ -19,13 +19,13 @@ La fibrillation auriculaire (AFib) est l'arythmie cardiaque la plus fréquente e
 
 ## Datasets
 
-| Dataset | Rôle |
-|---|---|
-| [MIT-BIH AFib DB](https://physionet.org/content/afdb/) | Entraînement + validation principale |
-| [MIT-BIH NSR DB](https://physionet.org/content/nsrdb/) | Exemples négatifs supplémentaires |
-| [Long-Term AFib DB](https://physionet.org/content/ltafdb/) | Évaluation externe (généralisation) |
+| Dataset | Rôle | Fiche |
+|---|---|---|
+| [MIT-BIH AFib DB](https://physionet.org/content/afdb/) | Entraînement + validation principale | [`docs/datasets/afdb.md`](docs/datasets/afdb.md) |
+| [MIT-BIH NSR DB](https://physionet.org/content/nsrdb/) | Exemples négatifs supplémentaires | [`docs/datasets/nsrdb.md`](docs/datasets/nsrdb.md) |
+| [Long-Term AFib DB](https://physionet.org/content/ltafdb/) | Évaluation externe (généralisation) | [`docs/datasets/ltafdb.md`](docs/datasets/ltafdb.md) |
 
-Tous les datasets sont libres et téléchargés automatiquement via la commande `make data`.
+Tous les datasets sont libres et téléchargés automatiquement via la commande `make data`. Pour la motivation de chaque dataset et les pièges méthodologiques associés, voir [`docs/datasets/README.md`](docs/datasets/README.md).
 
 ## Quick start
 
