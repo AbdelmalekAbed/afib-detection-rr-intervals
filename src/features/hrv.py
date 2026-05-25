@@ -63,3 +63,10 @@ FEATURE_NAMES = [
     "min_rr",
     "max_rr",
 ]
+
+
+def featurize_windows(X: np.ndarray) -> np.ndarray:
+    """Apply :func:`feature_vector` to every row of a (n, window_size) array."""
+    if X.ndim != 2:
+        raise ValueError(f"expected 2D array, got shape {X.shape}")
+    return np.stack([feature_vector(row) for row in X])
