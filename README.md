@@ -80,7 +80,7 @@ Projet structuré en 7 phases sur 16 semaines.
 - [x] Phase 4 — Compression (quantization, pruning, ONNX) sur archi Phase 3
 - [x] Phase 4b — Compression sur archi Phase 3.5 (~30k params) — atteint la cible <200 KB
 - [x] Phase 5 — Robustesse cross-dataset (AFDB → LTAFDB)
-- [ ] Phase 6 — Démo Streamlit
+- [x] Phase 6 — Démo Streamlit (AFib Sandbox, 5 pages interactives Plotly)
 - [ ] Phase 7 — Rapport + polish
 
 ## Résultats clés
