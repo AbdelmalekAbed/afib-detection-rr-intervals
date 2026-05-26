@@ -71,14 +71,15 @@ afib-cnn-lstm/
 
 ## État d'avancement
 
-Voir [`/home/abdou/.claude/plans/je-veux-que-tu-synchronous-meadow.md`](../.claude/plans/je-veux-que-tu-synchronous-meadow.md) pour le planning détaillé en 7 phases (16 semaines).
+Projet structuré en 7 phases sur 16 semaines.
 
 - [x] Phase 0 — Cadrage & setup
-- [ ] Phase 1 — Pipeline de données & EDA
-- [ ] Phase 2 — Baselines
-- [ ] Phase 3 — CNN-LSTM & optimisation Optuna
-- [ ] Phase 4 — Compression (quantization, pruning, ONNX)
-- [ ] Phase 5 — Robustesse cross-dataset
+- [x] Phase 1 — Pipeline de données & EDA
+- [x] Phase 2 — Baselines (4 modèles sous CV patient-level partagée)
+- [x] Phase 3 — CNN-LSTM & optimisation Optuna (+ Phase 3.5 : régularisation focalisée w=60)
+- [x] Phase 4 — Compression (quantization, pruning, ONNX) sur archi Phase 3
+- [x] Phase 4b — Compression sur archi Phase 3.5 (~30k params) — atteint la cible <200 KB
+- [x] Phase 5 — Robustesse cross-dataset (AFDB → LTAFDB)
 - [ ] Phase 6 — Démo Streamlit
 - [ ] Phase 7 — Rapport + polish
 
