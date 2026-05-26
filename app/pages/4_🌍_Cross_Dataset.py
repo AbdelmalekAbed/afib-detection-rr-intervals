@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from sklearn.metrics import f1_score
 
-from app.utils import (
+from utils import (
     get_demo_patients_ltafdb,
     header,
     kpi_row,

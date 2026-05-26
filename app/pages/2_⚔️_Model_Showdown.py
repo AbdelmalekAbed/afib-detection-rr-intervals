@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from sklearn.metrics import f1_score, roc_auc_score
 
-from app.utils import get_demo_patients_afdb, header, load_oof_npz
+from utils import get_demo_patients_afdb, header, load_oof_npz
 
 st.set_page_config(page_title="Model Showdown", page_icon="⚔️", layout="wide")
 

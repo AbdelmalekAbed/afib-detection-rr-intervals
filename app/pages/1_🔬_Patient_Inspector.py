@@ -18,7 +18,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 from sklearn.metrics import confusion_matrix, f1_score
 
-from app.utils import get_demo_patients_ltafdb, header, kpi_row
+from utils import get_demo_patients_ltafdb, header, kpi_row
 
 st.set_page_config(page_title="Patient Inspector", page_icon="🔬", layout="wide")
 

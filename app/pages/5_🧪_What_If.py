@@ -14,7 +14,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.utils import WINDOW, header, load_source_model, predict_scores
+from utils import WINDOW, header, load_source_model, predict_scores
 
 st.set_page_config(page_title="What-If Lab", page_icon="🧪", layout="wide")
 

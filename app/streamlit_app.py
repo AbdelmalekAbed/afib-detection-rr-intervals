@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.utils import (
+from utils import (
     FIGURES,
     PROJECT_ROOT,
     header,
