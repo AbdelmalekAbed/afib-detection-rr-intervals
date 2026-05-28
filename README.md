@@ -5,8 +5,9 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-CPU-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-WIP-red.svg)]()
+[![Status](https://img.shields.io/badge/status-Phase%207%20%E2%80%94%20Report-yellow.svg)]()
 [![Streamlit](https://img.shields.io/badge/Streamlit-AFib%20Sandbox-FF4B4B?logo=streamlit)](app/README.md)
+[![Report](https://img.shields.io/badge/Report-LaTeX%20scaffold-008080?logo=overleaf)](report/README.md)
 
 ## Live Demo
 
@@ -16,6 +17,17 @@ real patient timelines, swap compression variants live, and sketch RR series by 
 - Hosted demo: **[TODO: Streamlit Cloud URL]**
 - Local launch: `make demo` (or `streamlit run app/streamlit_app.py`)
 - Walkthrough: [`app/README.md`](app/README.md)
+
+## Rapport (mémoire)
+
+Le mémoire est rédigé en **LaTeX** (plan IMRAD strict, directives Sayadi : 12 pt
+Times-like, interligne 1,5, marges 25 mm). Le squelette complet — 6 chapitres,
+biblio IEEE, page de garde, résumé FR + abstract EN — est prêt à compiler sur
+Overleaf.
+
+- Source LaTeX : [`report/`](report/)
+- Guide de compilation + checklist des placeholders à remplir : [`report/README.md`](report/README.md)
+- 28 figures déjà wrappées en PDF par [`scripts/png_to_pdf.py`](scripts/png_to_pdf.py)
 
 ---
 
@@ -41,8 +53,8 @@ Tous les datasets sont libres et téléchargés automatiquement via la commande 
 
 ```bash
 # Cloner
-git clone https://github.com/<user>/afib-cnn-lstm.git
-cd afib-cnn-lstm
+git clone https://github.com/AbdelmalekAbed/afib-detection-rr-intervals.git
+cd afib-detection-rr-intervals
 
 # Option A — Makefile (uv + venv + extras)
 make setup
@@ -87,6 +99,7 @@ sous cet environnement.
 | 4 / 4b | Compression — quantization, pruning, ONNX (archi 100k puis 30k → 87 KB INT8) | [`notebooks/05_phase4_compression.ipynb`](notebooks/05_phase4_compression.ipynb) |
 | 5 | Robustesse cross-dataset AFDB → LTAFDB (zero-shot, scratch, fine-tune) | [`notebooks/06_phase5_cross_dataset.ipynb`](notebooks/06_phase5_cross_dataset.ipynb) |
 | 6 | Démo interactive Streamlit (AFib Sandbox, 5 pages) | [`app/README.md`](app/README.md) |
+| 7 | Rapport LaTeX (IMRAD strict, conforme directives Sayadi) | [`report/README.md`](report/README.md) |
 
 ## Structure du repo
 
@@ -119,19 +132,35 @@ Projet structuré en 7 phases sur 16 semaines.
 - [x] Phase 4b — Compression sur archi Phase 3.5 (~30k params) — atteint la cible <200 KB
 - [x] Phase 5 — Robustesse cross-dataset (AFDB → LTAFDB)
 - [x] Phase 6 — Démo Streamlit (AFib Sandbox, 5 pages interactives Plotly)
-- [ ] Phase 7 — Rapport + polish
+- [~] Phase 7 — Rapport + polish (en cours)
+  - [x] Squelette LaTeX (6 chapitres IMRAD, biblio IEEE, page de garde, résumé FR + abstract EN) — voir [`report/`](report/)
+  - [x] 28 figures wrappées en PDF pour `\includegraphics` — voir [`scripts/png_to_pdf.py`](scripts/png_to_pdf.py)
+  - [x] Polish repo (`app/README.md`, badges, audits docs)
+  - [ ] Déploiement Streamlit Cloud (URL publique)
+  - [ ] Captures d'écran sandbox (`docs/img/sandbox_page{1..5}.png`)
+  - [ ] Ré-export vectoriel des figures via utilitaire `save_fig` (notebooks)
+  - [ ] Page de garde + remerciements à personnaliser (école, encadrants, jury)
+  - [ ] Compléter les valeurs `[XX]` des tables résultats
 
 ## Résultats clés
 
-> *À compléter à la fin du projet.*
+Synthèse — les valeurs détaillées figurent dans les notebooks correspondants et
+seront consolidées dans le rapport LaTeX ([`report/chapters/04_resultats.tex`](report/chapters/04_resultats.tex)).
 
-| Modèle | F1 (patient) | AUROC | Taille | Latence CPU |
-|---|---|---|---|---|
-| HRV + RF (baseline) | — | — | — | — |
-| CNN seul | — | — | — | — |
-| LSTM seul | — | — | — | — |
-| **CNN-LSTM (notre)** | — | — | — | — |
-| CNN-LSTM quantisé | — | — | — | — |
+| Modèle | F1 (patient) | Taille | Notes |
+|---|---|---|---|
+| HRV + Random Forest (baseline)     | ~0.70 | — | feature engineering classique |
+| HRV + XGBoost (baseline)           | ~0.72 | — | meilleure baseline |
+| CNN-LSTM (Phase 3, ~100k params)   | ~0.72 | 400+ KB FP32 | plafond F1/patient observé |
+| **CNN-LSTM (Phase 3.5, ~30k params)** | ~0.72 | 120 KB FP32 | même F1, 3× plus compact |
+| CNN-LSTM Phase 3.5 + INT8 (Phase 4b) | ~0.68 | **87 KB** | cible <200 KB atteinte |
+| CNN-LSTM Phase 3.5 → LTAFDB (zero-shot, Phase 5) | ~0.70 | 87 KB | robustesse cross-dataset |
+
+**Lecture clé :** le plafond F1/patient ≈ 0.72 observé sur AFDB est confirmé
+indépendamment par LTAFDB en cross-dataset. Il s'agit d'une limite intrinsèque
+de l'information portée par les seuls intervalles RR ; les chiffres ≥ 0.95 de la
+littérature reposent typiquement sur une évaluation par fenêtre (avec fuite
+inter-patients), et non patient-level.
 
 ## Disclaimer médical
 
