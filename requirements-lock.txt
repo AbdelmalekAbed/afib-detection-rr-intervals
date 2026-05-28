@@ -1,4 +1,4 @@
--e file:///home/abdou/Master
+-e .
 aiohappyeyeballs==2.6.2
 aiohttp==3.13.5
 aiosignal==1.4.0
@@ -137,7 +137,7 @@ scikit-learn==1.8.0
 scipy==1.17.1
 seaborn==0.13.2
 send2trash==2.1.0
-setuptools==70.2.0
+setuptools==82.0.1
 six==1.17.0
 smmap==5.0.3
 soundfile==0.13.1
