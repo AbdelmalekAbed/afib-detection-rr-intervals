@@ -1,0 +1,180 @@
+% =====================================================================
+%  Chapitre 4 — Résultats
+%  Règles (Sayadi 4) :
+%   - tableaux/courbes/figures totalement DÉCRITS (variations, valeurs, taux d'erreur)
+%   - et COMMENTÉS (comparaison, amélioration, limitation)
+%   - éviter de dupliquer figure + tableau
+%   - temps : passé pour l'analyse, présent pour décrire une figure/tableau
+% =====================================================================
+\chapter{Résultats expérimentaux}
+\label{ch:resultats}
+
+% --- 4.1 Phase 1 — EDA ----------------------------------------------
+\section{Phase 1 — Exploration des données}
+\label{sec:res:eda}
+
+\subsection{Prévalence de la \FA{} par patient}
+La répartition de la prévalence de la \FA{} parmi les 25~patients d'AFDB est rapportée à la figure~\ref{fig:res:prevalence}. La prévalence par patient s'étend de \texttt{[XX]\%} à \texttt{[XX]\%} avec une médiane de \texttt{[XX]\%}, ce qui confirme une \keyword{forte hétérogénéité inter-patients}.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][6cm]{Histogramme + boîte à moustaches de la prévalence FA par patient (AFDB)}
+  \caption{Distribution de la prévalence de la \FA{} par patient dans la base AFDB.}
+  \label{fig:res:prevalence}
+\end{figure}
+
+\subsection{Distribution des intervalles \RR{}}
+Les distributions conditionnelles des \RR{} en rythme sinusal et en \FA{} sont présentées à la figure~\ref{fig:res:rr_dist}. La distribution en \FA{} est sensiblement plus étalée et plus asymétrique, ce qui justifie l'utilisation d'un descripteur de variabilité comme entrée du modèle.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][6cm]{Densités RR : rythme sinusal vs FA (kernel density estimate)}
+  \caption{Densités des intervalles \RR{} conditionnellement au rythme.}
+  \label{fig:res:rr_dist}
+\end{figure}
+
+% --- 4.2 Phase 2 — Baselines -----------------------------------------
+\section{Phase 2 — Méthodes de référence}
+\label{sec:res:baselines}
+
+Les performances des quatre baselines sous validation croisée à 5~plis patient-level sont rapportées à la table~\ref{tab:res:baselines}.
+
+\begin{table}[H]
+  \centering
+  \caption{Performance des baselines (médiane $\pm$ IQR sur 25~patients, AFDB).}
+  \label{tab:res:baselines}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Méthode} & \textbf{F1 patient} & \textbf{\AUROC{}} & \textbf{Sensibilité} & \textbf{Spécificité} \\
+    \midrule
+    Règle métier            & [XX] & [XX] & [XX] & [XX] \\
+    Forêt aléatoire         & [XX] & [XX] & [XX] & [XX] \\
+    Gradient boosting       & [XX] & [XX] & [XX] & [XX] \\
+    \CNN{} 1D               & [XX] & [XX] & [XX] & [XX] \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Les résultats montrent que \texttt{[À COMPLÉTER]}. Une remarque centrale ressort : \emph{aucune} des baselines ne dépasse un \(F_1\) patient de \texttt{[XX]}, ce qui suggère un plafond intrinsèque difficile à franchir avec ces seules approches.
+
+% --- 4.3 Phase 3 — CNN-LSTM + Optuna --------------------------------
+\section{Phase 3 — Modèle \CNN--\LSTM{} optimisé}
+\label{sec:res:cnnlstm}
+
+\subsection{Recherche d'hyperparamètres}
+Optuna a exploré \texttt{[XX]} essais sur \texttt{[XX]} heures. La distribution des scores et l'importance relative des hyperparamètres sont présentées à la figure~\ref{fig:res:optuna}.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][6cm]{Diagramme Optuna : importance des hyperparamètres + scatter score vs nombre d'essais}
+  \caption{Résultats de la recherche bayésienne par \textit{Optuna}.}
+  \label{fig:res:optuna}
+\end{figure}
+
+\subsection{Performance du modèle retenu}
+La table~\ref{tab:res:cnnlstm} compare le modèle retenu aux meilleures baselines.
+
+\begin{table}[H]
+  \centering
+  \caption{Comparaison du \CNN--\LSTM{} optimisé aux baselines.}
+  \label{tab:res:cnnlstm}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Méthode} & \textbf{F1 patient} & \textbf{\AUROC{}} & \textbf{Sens.} & \textbf{Spéc.} \\
+    \midrule
+    Meilleure baseline (GB) & [XX] & [XX] & [XX] & [XX] \\
+    \CNN--\LSTM{} (initial) & [XX] & [XX] & [XX] & [XX] \\
+    \CNN--\LSTM{} (Optuna)  & [XX] & [XX] & [XX] & [XX] \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+L'amélioration apportée par l'optimisation Optuna est de \texttt{[XX]} points de \(F_1\) en valeur absolue par rapport au modèle initial.
+
+\subsection{Étude d'ablation}
+Une étude d'ablation a été menée pour quantifier la contribution de chaque composant ; ses résultats apparaissent à la figure~\ref{fig:res:ablation}.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][6cm]{Barplot ablation : F1 obtenu en retirant chaque composant (régularisation, BiLSTM, dropout, etc.)}
+  \caption{Étude d'ablation des composants du modèle.}
+  \label{fig:res:ablation}
+\end{figure}
+
+% --- 4.4 Phase 4 — Compression --------------------------------------
+\section{Phase 4 — Étude de compression}
+\label{sec:res:compression}
+
+Les huit variantes de compression évaluées sont synthétisées à la table~\ref{tab:res:compression}.
+
+\begin{table}[H]
+  \centering
+  \caption{Compromis taille / performance des variantes de compression.}
+  \label{tab:res:compression}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Variante} & \textbf{Taille (KB)} & \textbf{F1 patient} & \(\Delta\)F1 & \textbf{Latence (ms)} \\
+    \midrule
+    V0 — référence FP32          & [XX] & [XX] & 0 & [XX] \\
+    V1 — pruning 30~\%           & [XX] & [XX] & [XX] & [XX] \\
+    V2 — pruning + fine-tune     & [XX] & [XX] & [XX] & [XX] \\
+    V3 — quant. dynamique        & [XX] & [XX] & [XX] & [XX] \\
+    V4 — quant. statique INT8    & 87   & [XX] & [XX] & [XX] \\
+    V5 — ONNX FP32               & [XX] & [XX] & [XX] & [XX] \\
+    V6 — ONNX + quant.           & [XX] & [XX] & [XX] & [XX] \\
+    V7 — pruning + INT8          & [XX] & [XX] & [XX] & [XX] \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+La variante V4 a atteint la cible des 200~KB visée pour l'embarqué (87~KB obtenus) avec une perte de \(F_1\) inférieure à \texttt{[XX]} points. Le compromis taille / performance est visualisé à la figure~\ref{fig:res:pareto}.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][6cm]{Frontière Pareto : F1 vs taille pour les 8 variantes}
+  \caption{Compromis taille / performance des variantes de compression.}
+  \label{fig:res:pareto}
+\end{figure}
+
+% --- 4.5 Phase 5 — Cross-dataset ------------------------------------
+\section{Phase 5 — Robustesse cross-dataset (AFDB $\rightarrow$ LTAFDB)}
+\label{sec:res:cross}
+
+Le modèle entraîné exclusivement sur AFDB a été évalué sans réentraînement sur LTAFDB. Les résultats apparaissent à la table~\ref{tab:res:cross}.
+
+\begin{table}[H]
+  \centering
+  \caption{Performance du modèle final sur les deux jeux de données.}
+  \label{tab:res:cross}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Jeu de test} & \textbf{F1 patient} & \textbf{\AUROC{}} & \textbf{Sens.} \\
+    \midrule
+    AFDB (interne, CV)        & [XX] & [XX] & [XX] \\
+    LTAFDB (externe)          & [XX] & [XX] & [XX] \\
+    \(\Delta\) absolu         & [XX] & [XX] & [XX] \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+La perte cross-dataset observée est de \texttt{[XX]} points de \(F_1\). La figure~\ref{fig:res:boxplot_cross} montre la dispersion par patient sur les deux bases.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][6cm]{Boîtes à moustaches F1/patient : AFDB vs LTAFDB côte à côte}
+  \caption{Dispersion inter-patient sur les deux jeux de données.}
+  \label{fig:res:boxplot_cross}
+\end{figure}
+
+% --- 4.6 Phase 6 — Sandbox ------------------------------------------
+\section{Phase 6 — Application interactive}
+\label{sec:res:sandbox}
+
+Une application \textit{Streamlit} a été développée pour permettre l'exploration patient par patient des décisions du modèle. Elle comporte cinq onglets : \emph{Patient Inspector}, \emph{Model Showdown}, \emph{Compression Lab}, \emph{Cross-Dataset} et \emph{What-If}.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][7cm]{Capture d'écran de l'onglet Patient Inspector — tachogramme + probabilité prédite}
+  \caption{Capture d'écran de l'application \textit{Streamlit} (\emph{Patient Inspector}).}
+  \label{fig:res:sandbox}
+\end{figure}

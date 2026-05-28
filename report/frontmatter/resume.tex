@@ -1,0 +1,32 @@
+% =====================================================================
+%  Résumé (FR) + Abstract (EN) + Mots-clés
+%  Règle (Buttler) : <= 250 mots, mini-version du mémoire, écrit au passé,
+%  autosuffisant, sans citation ni figure.
+% =====================================================================
+
+% ---------- Résumé en français ----------------------------------------
+\chapter*{Résumé}
+\addcontentsline{toc}{chapter}{Résumé}
+
+La fibrillation auriculaire (FA) est l'arythmie cardiaque la plus fréquente et représente un facteur de risque majeur d'accident vasculaire cérébral. Sa détection automatique à partir d'enregistrements ECG longue durée constitue un enjeu clinique reconnu.
+
+Ce travail a proposé une chaîne complète de détection de la FA fondée uniquement sur les intervalles \RR{}, en évitant le coût de l'analyse morphologique de l'\ECG{}. Quatre méthodes de référence ont d'abord été établies sous validation croisée à l'échelle du patient afin de quantifier la difficulté intrinsèque du problème. Un réseau hybride \CNN--\LSTM{} a ensuite été conçu, optimisé par recherche d'hyperparamètres bayésienne (\textit{Optuna}), puis comprimé en vue d'un déploiement embarqué. Sa robustesse a été évaluée par transfert sur un second jeu de données acquis dans des conditions cliniques différentes (LTAFDB). Une application interactive a finalement été développée pour permettre l'exploration des décisions du modèle.
+
+Les résultats ont montré [\textit{à compléter — métriques finales : F1/patient, AUROC, taille modèle après quantification, perte cross-dataset}]. L'analyse a mis en évidence un \textit{plateau intrinsèque} au signal \RR{} seul, dépassable uniquement par l'apport d'une information morphologique additionnelle.
+
+\medskip
+\textbf{Mots-clés :} fibrillation auriculaire ; intervalles \RR{} ; apprentissage profond ; réseau hybride \CNN--\LSTM{} ; compression de modèles ; généralisation cross-dataset.
+
+\bigskip
+
+% ---------- Abstract in English ---------------------------------------
+\section*{Abstract}
+
+Atrial fibrillation (AF) is the most common cardiac arrhythmia and a major risk factor for stroke. Automated detection from long-term ECG recordings is a recognised clinical need.
+
+This work proposed a complete AF detection pipeline based solely on \RR{} intervals, avoiding the cost of ECG morphology analysis. Four baseline methods were first established under patient-level cross-validation to quantify the intrinsic difficulty of the task. A hybrid \CNN--\LSTM{} network was then designed, tuned via Bayesian hyperparameter search (\textit{Optuna}), and compressed for embedded deployment. Its robustness was assessed through transfer to a second dataset acquired under different clinical conditions (LTAFDB). An interactive application was finally developed to explore the model's decisions.
+
+The results showed [\textit{to be completed — final metrics: patient-level F1, AUROC, post-quantisation model size, cross-dataset performance drop}]. The analysis highlighted an \textit{intrinsic plateau} of \RR{}-only signals, which can only be overcome by adding morphological information.
+
+\medskip
+\textbf{Keywords:} atrial fibrillation; \RR{} intervals; deep learning; hybrid \CNN--\LSTM{}; model compression; cross-dataset generalisation.

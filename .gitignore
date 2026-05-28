@@ -71,3 +71,14 @@ secrets.yaml
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Experiment tracking (in case wandb/mlflow are added later)
+wandb/
+mlflow/
+
+# Ruff cache
+.ruff_cache/
+
+# Local-only reference material (not for the public repo)
+instructions report/
+prototypes mémoire/

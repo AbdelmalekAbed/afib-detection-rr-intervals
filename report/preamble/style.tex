@@ -1,0 +1,40 @@
+% =====================================================================
+%  Style — applique les directives Sayadi
+% =====================================================================
+
+% ----- Interligne 1.5 ------------------------------------------------
+\onehalfspacing
+
+% ----- En-tête / pied de page ----------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\nouppercase{\leftmark}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Page de premier chapitre — style « plain » sans en-tête
+\fancypagestyle{plain}{%
+  \fancyhf{}%
+  \fancyfoot[C]{\thepage}%
+  \renewcommand{\headrulewidth}{0pt}%
+}
+
+% ----- Mise en forme des titres de chapitre --------------------------
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\Large\bfseries}
+  {\chaptertitlename\ \thechapter}{14pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{0pt}{20pt}
+
+\titleformat{\section}{\normalfont\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{1em}{}
+
+% ----- Justification du texte ----------------------------------------
+% Justifié par défaut dans `report` ; on désactive l'over/underfull warnings cosmétiques
+\tolerance=1000
+\emergencystretch=1em
+
+% ----- Profondeur du sommaire ----------------------------------------
+\setcounter{tocdepth}{3}
+\setcounter{secnumdepth}{3}

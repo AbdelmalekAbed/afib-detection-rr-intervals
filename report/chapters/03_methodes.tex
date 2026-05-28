@@ -1,0 +1,203 @@
+% =====================================================================
+%  Chapitre 3 — Matériel et méthodes
+%  Règles (Sayadi/Buttler) :
+%   - temps : passé
+%   - algorithmes séparés, encadrés, avec titre (env. `algorithm`)
+%   - organigrammes/schémas plutôt que phrases pour les pipelines
+%   - reproductibilité totale
+% =====================================================================
+\chapter{Matériel et méthodes}
+\label{ch:methodes}
+
+% --- 3.1 Vue d'ensemble ---------------------------------------------
+\section{Vue d'ensemble du pipeline}
+\label{sec:meth:pipeline}
+
+Le pipeline complet, illustré à la figure~\ref{fig:meth:pipeline}, a été décomposé en six étapes successives.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.95\linewidth][7cm]{Organigramme du pipeline : AFDB $\rightarrow$ détection R $\rightarrow$ fenêtrage $\rightarrow$ split patient-level $\rightarrow$ modèle $\rightarrow$ évaluation}
+  \caption{Vue d'ensemble du pipeline de détection de la \FA{} adopté dans ce mémoire.}
+  \label{fig:meth:pipeline}
+\end{figure}
+
+% --- 3.2 Données -----------------------------------------------------
+\section{Données et prétraitement}
+\label{sec:meth:donnees}
+
+\subsection{Source et accès}
+Les enregistrements ont été téléchargés depuis PhysioNet via la bibliothèque \texttt{wfdb}. Pour chaque enregistrement, les annotations de battements et de rythme ont été récupérées au format natif.
+
+\subsection{Construction du tachogramme}
+Pour chaque patient, la suite des intervalles \RR{} a été obtenue à partir des positions d'ondes R fournies par les annotations expertes. Aucune détection automatique de R n'a été réalisée afin d'éviter d'introduire un biais lié au détecteur.
+
+\subsection{Fenêtrage}
+La série \RR{} a été segmentée en fenêtres glissantes de longueur \(W\) battements. Chaque fenêtre a reçu l'étiquette du rythme majoritaire couvert par celle-ci (un seuil de pureté de 50~\% a été appliqué).
+
+\subsection{Split patient-level}
+Tous les patients ont été assignés exclusivement à un sous-ensemble (entraînement, validation ou test) : aucune fuite inter-patient n'a été tolérée. Ce protocole, central pour l'honnêteté de l'évaluation, est illustré par l'algorithme~\ref{alg:meth:split}.
+
+\begin{algorithm}[H]
+  \caption{Validation croisée à l'échelle du patient}
+  \label{alg:meth:split}
+  \begin{algorithmic}[1]
+    \Require ensemble de patients $\mathcal{P}$, nombre de \textit{folds} $K$
+    \Ensure \textit{folds} de patients $(\mathcal{F}_1, \dots, \mathcal{F}_K)$ disjoints
+    \State Mélanger $\mathcal{P}$ avec graine fixée
+    \State Partitionner $\mathcal{P}$ en $K$ sous-ensembles équilibrés en prévalence FA
+    \For{$k = 1$ à $K$}
+      \State $\mathcal{F}_k^{\text{test}} \gets$ patients du \textit{fold} $k$
+      \State $\mathcal{F}_k^{\text{train}} \gets \mathcal{P} \setminus \mathcal{F}_k^{\text{test}}$
+    \EndFor
+    \State \Return $(\mathcal{F}_1, \dots, \mathcal{F}_K)$
+  \end{algorithmic}
+\end{algorithm}
+
+% --- 3.3 Modèles -----------------------------------------------------
+\section{Modèles étudiés}
+\label{sec:meth:modeles}
+
+\subsection{Baselines}
+Quatre méthodes de référence ont été implémentées :
+\begin{itemize}
+  \item \textbf{Règle métier} fondée sur le coefficient de variation des \RR{} ;
+  \item \textbf{Forêt aléatoire} sur descripteurs statistiques ;
+  \item \textbf{Gradient boosting} (XGBoost) sur les mêmes descripteurs ;
+  \item \textbf{\CNN{} 1D} appliqué directement à la série \RR{}.
+\end{itemize}
+
+\subsection{Modèle proposé : \CNN--\LSTM{}}
+Le modèle final combine un encodeur convolutionnel 1D et une couche récurrente \LSTM{} bidirectionnelle. Son architecture est décrite à la figure~\ref{fig:meth:archi}.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][7cm]{Schéma de l'architecture CNN-LSTM (encodeur conv \(\rightarrow\) BiLSTM \(\rightarrow\) tête dense)}
+  \caption{Architecture du modèle hybride \CNN--\LSTM{} proposé.}
+  \label{fig:meth:archi}
+\end{figure}
+
+\subsection{Recherche d'hyperparamètres}
+Les hyperparamètres ont été optimisés à l'aide de la bibliothèque \texttt{Optuna} \cite{akiba2019optuna}. La fonction objectif a été définie comme le \(F_1\) moyenné sur les \textit{folds} de validation.
+
+\subsection{Compression}
+Quatre techniques ont été combinées : pruning structuré, quantification dynamique PyTorch, quantification statique INT8 et export ONNX. Les variantes étudiées sont synthétisées à la table~\ref{tab:meth:compression}.
+
+\begin{table}[H]
+  \centering
+  \caption{Variantes de compression évaluées.}
+  \label{tab:meth:compression}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Variante} & \textbf{Technique} & \textbf{Cible} \\
+    \midrule
+    V0 & Modèle de référence FP32 & Référence \\
+    V1 & Pruning structuré 30~\% & Sparsité \\
+    V2 & Pruning + fine-tune & Récupération performance \\
+    V3 & Quantification dynamique & Inférence CPU \\
+    V4 & Quantification statique INT8 & Empreinte mémoire \\
+    V5 & Export ONNX FP32 & Portabilité \\
+    V6 & ONNX + quantification & Embarqué \\
+    V7 & Combinaison pruning + INT8 & Taille minimale \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% --- 3.4 Critères d'évaluation -- IMPORTANT : intégrer le PDF Critères --
+\section{Critères d'évaluation}
+\label{sec:meth:criteres}
+
+L'évaluation d'un classifieur binaire repose sur la matrice de confusion présentée à la table~\ref{tab:meth:confusion}.
+
+\begin{table}[H]
+  \centering
+  \caption{Matrice de confusion d'un classifieur binaire.}
+  \label{tab:meth:confusion}
+  \begin{tabular}{c|cc}
+    \toprule
+     & \textbf{Prédit négatif} & \textbf{Prédit positif} \\
+    \midrule
+    \textbf{Réel négatif} & \VN{} & \FP{} \\
+    \textbf{Réel positif} & \FN{} & \VP{} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\noindent où :
+\begin{itemize}[leftmargin=*]
+  \item \(\VP{}\) : nombre de cas correctement classés positifs ;
+  \item \(\VN{}\) : nombre de cas correctement classés négatifs ;
+  \item \(\FP{}\) : nombre de cas négatifs incorrectement classés positifs ;
+  \item \(\FN{}\) : nombre de cas positifs incorrectement classés négatifs.
+\end{itemize}
+
+Dans le contexte de la détection de la \FA{}, la minimisation des \FN{} est prioritaire : un épisode manqué peut conduire à un accident vasculaire cérébral non prévenu.
+
+\subsection{Métriques classiques}
+
+\begin{equation}
+  \mathrm{Exactitude} = \frac{\VP{} + \VN{}}{\VP{} + \VN{} + \FP{} + \FN{}}
+  \label{eq:meth:accuracy}
+\end{equation}
+
+\begin{equation}
+  \mathrm{Pr\acute{e}cision} = \frac{\VP{}}{\VP{} + \FP{}}
+  \label{eq:meth:precision}
+\end{equation}
+
+\begin{equation}
+  \mathrm{Rappel} = \mathrm{Sensibilit\acute{e}} = \frac{\VP{}}{\VP{} + \FN{}}
+  \label{eq:meth:rappel}
+\end{equation}
+
+\begin{equation}
+  \mathrm{Sp\acute{e}cificit\acute{e}} = \frac{\VN{}}{\VN{} + \FP{}}
+  \label{eq:meth:specificite}
+\end{equation}
+
+\begin{equation}
+  F_1 = 2 \cdot \frac{\mathrm{Pr\acute{e}cision} \cdot \mathrm{Rappel}}{\mathrm{Pr\acute{e}cision} + \mathrm{Rappel}}
+  \label{eq:meth:f1}
+\end{equation}
+
+\begin{equation}
+  \mathrm{DICE} = \frac{2\,\VP{}}{2\,\VP{} + \FP{} + \FN{}}
+  \label{eq:meth:dice}
+\end{equation}
+
+L'exactitude (équation~\ref{eq:meth:accuracy}) perd de sa pertinence en présence de classes déséquilibrées. Dans ce travail, où la prévalence de la \FA{} est inférieure à 50~\%, le score \(F_1\) (équation~\ref{eq:meth:f1}) a été préféré comme critère principal.
+
+\subsection{Courbe ROC et aire sous la courbe (AUC)}
+La courbe ROC trace la sensibilité en fonction du complément à 1 de la spécificité, paramétrée par le seuil de décision. L'aire sous la courbe (\AUROC{}) constitue une métrique de séparabilité indépendante du seuil.
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.7\linewidth][6cm]{Courbe ROC type avec AUC = 0,90 — diagonale = classifieur aléatoire}
+  \caption{Exemple de courbe ROC. Plus l'aire sous la courbe est proche de 1, meilleur est le classifieur.}
+  \label{fig:meth:roc}
+\end{figure}
+
+\subsection{Représentation par boîte à moustaches}
+La performance étant agrégée à l'échelle du \emph{patient}, la distribution des scores inter-patients a été visualisée par des boîtes à moustaches afin de mettre en évidence la dispersion plutôt que la seule moyenne.
+
+% --- 3.5 Environnement -----------------------------------------------
+\section{Environnement logiciel et matériel}
+\label{sec:meth:env}
+
+Les expériences ont été menées en Python~3.11 avec PyTorch~2.x, scikit-learn et Optuna. Le matériel utilisé est résumé à la table~\ref{tab:meth:env} ; le fichier \texttt{requirements-lock.txt} du dépôt fixe les versions exactes pour assurer la reproductibilité.
+
+\begin{table}[H]
+  \centering
+  \caption{Environnement logiciel et matériel.}
+  \label{tab:meth:env}
+  \begin{tabular}{ll}
+    \toprule
+    Système d'exploitation & Linux 6.8 \\
+    Langage                & Python 3.11 \\
+    Frameworks             & PyTorch 2.x, scikit-learn, Optuna, ONNX Runtime \\
+    GPU                    & [À PRÉCISER] \\
+    CPU                    & [À PRÉCISER] \\
+    Suivi d'expériences    & Optuna SQLite \\
+    \bottomrule
+  \end{tabular}
+\end{table}

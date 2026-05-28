@@ -1,0 +1,42 @@
+% =====================================================================
+%  Commandes personnalisées
+% =====================================================================
+
+% ----- Placeholder figure (boîte TikZ avec libellé) -------------------
+% Usage : \figplaceholder{Légende} ou \figplaceholder[hauteur=6cm]{Légende}
+\NewDocumentCommand{\figplaceholder}{O{0.8\linewidth} O{6cm} m}{%
+  \begin{tikzpicture}
+    \draw[dashed,line width=0.6pt,fill=gray!8]
+      (0,0) rectangle (#1,#2);
+    \node[align=center,text width=0.9\dimexpr#1] at (#1/2,#2/2) {%
+      \large\textbf{[FIGURE — à insérer]}\\[2pt]%
+      \normalsize\itshape #3%
+    };
+  \end{tikzpicture}%
+}
+
+% ----- Notation cohérente VP/VN/FP/FN (directives Critères PDF) ------
+\newcommand{\VP}{\mathrm{VP}}
+\newcommand{\VN}{\mathrm{VN}}
+\newcommand{\FP}{\mathrm{FP}}
+\newcommand{\FN}{\mathrm{FN}}
+
+% ----- Acronymes du projet ------------------------------------------
+\newcommand{\FA}{FA}                       % Fibrillation auriculaire
+\newcommand{\ECG}{ECG}
+\newcommand{\CNN}{CNN}
+\newcommand{\LSTM}{LSTM}
+\newcommand{\AUROC}{AUROC}
+\newcommand{\RR}{RR}
+
+% ----- Encadré pour algorithmes (sans \fbox — directive 22 Sayadi) ----
+% On utilise l'environnement `algorithm` qui est encadré par convention
+% mais sans cadre dessiné autour du contenu.
+
+% ----- Mot-clé visible (mise en valeur sans gras dans le texte) -------
+\newcommand{\keyword}[1]{\emph{#1}}
+
+% ----- Numérotation des équations par chapitre ----------------------
+\numberwithin{equation}{chapter}
+\numberwithin{figure}{chapter}
+\numberwithin{table}{chapter}

@@ -6,6 +6,16 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-CPU-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-WIP-red.svg)]()
+[![Streamlit](https://img.shields.io/badge/Streamlit-AFib%20Sandbox-FF4B4B?logo=streamlit)](app/README.md)
+
+## Live Demo
+
+An interactive Streamlit playground (**AFib Sandbox**, 5 pages) lets you scrub through
+real patient timelines, swap compression variants live, and sketch RR series by hand.
+
+- Hosted demo: **[TODO: Streamlit Cloud URL]**
+- Local launch: `make demo` (or `streamlit run app/streamlit_app.py`)
+- Walkthrough: [`app/README.md`](app/README.md)
 
 ---
 
@@ -34,21 +44,49 @@ Tous les datasets sont libres et téléchargés automatiquement via la commande 
 git clone https://github.com/<user>/afib-cnn-lstm.git
 cd afib-cnn-lstm
 
-# Installer
+# Option A — Makefile (uv + venv + extras)
 make setup
-
-# Télécharger et prétraiter les données
 make data
-
-# Entraîner le modèle de référence
 make train
-
-# Évaluer (rapport sur test interne + LTAFDB externe)
 make eval
-
-# Lancer la démo Streamlit
 make demo
+
+# Option B — pip seul
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install streamlit plotly                # pour la démo
+streamlit run app/streamlit_app.py
 ```
+
+Cibles `make` disponibles : `setup`, `data`, `train`, `eval`, `demo`, `test`, `lint`,
+`format`, `clean` — voir `make help`.
+
+### Reproductibilité
+
+`requirements.txt` liste les contraintes hautes (`>=`) du `pyproject.toml`.
+Pour reproduire **à l'identique** l'environnement utilisé pour générer les figures
+et les checkpoints du dépôt, utiliser le lockfile :
+
+```bash
+pip install -r requirements-lock.txt
+```
+
+Le lockfile fige les versions exactes (Python 3.12, PyTorch CPU 2.x, ONNX
+Runtime, scikit-learn, Optuna, etc.) et est régénéré à chaque verrouillage de
+phase. Tous les résultats numériques du README et du rapport ont été obtenus
+sous cet environnement.
+
+## Phases & notebooks
+
+| Phase | Sujet | Notebook |
+|---|---|---|
+| 1 | EDA — distributions RR, Poincaré, déséquilibre par patient | [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb) |
+| 2 | Baselines HRV + RF, LR, MLP, XGBoost sous CV patient-level partagée | [`notebooks/02_baselines.ipynb`](notebooks/02_baselines.ipynb) |
+| 3 | CNN-LSTM + Optuna (archi ~100k params), ablation, courbes d'apprentissage | [`notebooks/03_ablation.ipynb`](notebooks/03_ablation.ipynb) |
+| 3.5 | Régularisation focalisée fenêtre w=60 (archi ~30k params) | [`notebooks/04_phase35_w60.ipynb`](notebooks/04_phase35_w60.ipynb) |
+| 4 / 4b | Compression — quantization, pruning, ONNX (archi 100k puis 30k → 87 KB INT8) | [`notebooks/05_phase4_compression.ipynb`](notebooks/05_phase4_compression.ipynb) |
+| 5 | Robustesse cross-dataset AFDB → LTAFDB (zero-shot, scratch, fine-tune) | [`notebooks/06_phase5_cross_dataset.ipynb`](notebooks/06_phase5_cross_dataset.ipynb) |
+| 6 | Démo interactive Streamlit (AFib Sandbox, 5 pages) | [`app/README.md`](app/README.md) |
 
 ## Structure du repo
 

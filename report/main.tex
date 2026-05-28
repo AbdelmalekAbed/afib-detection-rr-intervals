@@ -1,0 +1,71 @@
+% =====================================================================
+%  Mémoire de Master — Détection de la fibrillation auriculaire
+%  à partir des intervalles RR par un réseau hybride CNN-LSTM.
+%
+%  Compilation : pdflatex + biber + pdflatex x2   (ou bouton "Recompile" sur Overleaf)
+%  Classe      : report (12pt, A4)
+%  Format      : IMRAD strict — directives Sayadi (12pt Times, 1.5, marges 25 mm).
+% =====================================================================
+
+\documentclass[12pt,a4paper,oneside]{report}
+
+% ----- Préambule (packages, style, commandes) --------------------------
+\input{preamble/packages}
+\input{preamble/style}
+\input{preamble/commands}
+
+% ----- Bibliographie ---------------------------------------------------
+\addbibresource{bibliography/references.bib}
+
+\begin{document}
+
+% ----- Pages liminaires ------------------------------------------------
+\pagenumbering{roman}
+
+\input{frontmatter/pagedegarde}
+\cleardoublepage
+
+\input{frontmatter/dedicace}
+\cleardoublepage
+
+\input{frontmatter/remerciements}
+\cleardoublepage
+
+\input{frontmatter/resume}
+\cleardoublepage
+
+\tableofcontents
+\cleardoublepage
+
+\listoffigures
+\cleardoublepage
+
+\listoftables
+\cleardoublepage
+
+% Liste des abréviations (optionnelle — remplir au besoin)
+\input{frontmatter/acronymes}
+\cleardoublepage
+
+% ----- Corps du mémoire ------------------------------------------------
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{chapters/01_introduction}
+\input{chapters/02_etat_art}
+\input{chapters/03_methodes}
+\input{chapters/04_resultats}
+\input{chapters/05_discussion}
+\input{chapters/06_conclusion}
+
+% ----- Bibliographie ---------------------------------------------------
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{Références bibliographiques}
+\printbibliography[title={Références bibliographiques}]
+
+% ----- Annexes ---------------------------------------------------------
+\appendix
+\input{backmatter/annexes}
+
+\end{document}

@@ -1,0 +1,75 @@
+% =====================================================================
+%  Chapitre 6 — Conclusion et perspectives
+%  Règles (Sayadi 5 / Buttler) :
+%   - récapituler brièvement le cheminement et les conclusions intermédiaires
+%   - énumérer les propositions
+%   - terminer par limitations + perspectives futures
+% =====================================================================
+\chapter{Conclusion et perspectives}
+\label{ch:conclusion}
+
+% --- 6.1 Récapitulatif ----------------------------------------------
+\section{Récapitulatif du travail réalisé}
+\label{sec:concl:recap}
+
+Ce mémoire a proposé une chaîne complète de détection de la fibrillation auriculaire à partir des seuls intervalles \RR{}, structurée en six phases.
+
+La \textbf{phase~1} a établi un protocole d'évaluation patient-level rigoureux et caractérisé la forte hétérogénéité inter-patients de la base AFDB.
+
+La \textbf{phase~2} a comparé quatre méthodes de référence (règle métier, forêt aléatoire, gradient boosting, \CNN{} 1D) sous ce même protocole.
+
+La \textbf{phase~3} a conçu une architecture \CNN--\LSTM{} optimisée par recherche bayésienne, accompagnée d'une étude d'ablation.
+
+La \textbf{phase~4} a évalué huit variantes de compression et identifié la combinaison optimale (quantification statique INT8) qui atteint 87~KB d'empreinte mémoire sans dégradation significative.
+
+La \textbf{phase~5} a quantifié la perte cross-dataset par transfert AFDB~$\rightarrow$~LTAFDB.
+
+La \textbf{phase~6} a livré un tableau de bord interactif \textit{Streamlit} pour l'exploration patient par patient des décisions du modèle.
+
+% --- 6.2 Apports principaux -----------------------------------------
+\section{Apports principaux}
+\label{sec:concl:apports}
+
+Les apports de ce travail sont les suivants :
+\begin{itemize}[leftmargin=*]
+  \item la mise en évidence d'un \keyword{plateau intrinsèque} de \(F_1 \approx 0{,}75\text{--}0{,}80\) pour la classification patient à partir des seuls \RR{}, indépendant de la famille de classifieur ;
+  \item une étude de compression aboutie permettant un déploiement embarqué (modèle de 87~KB) ;
+  \item une mesure honnête de la robustesse cross-dataset, peu documentée jusqu'ici ;
+  \item un outil d'exploration interactive favorisant la transparence et la pédagogie auprès d'un public clinicien.
+\end{itemize}
+
+% --- 6.3 Limitations ------------------------------------------------
+\section{Limitations}
+\label{sec:concl:limites}
+
+Les principales limitations du travail, déjà discutées au chapitre~\ref{ch:discussion}, sont rappelées ici :
+\begin{itemize}
+  \item un effectif patient restreint sur AFDB ;
+  \item une dépendance aux annotations expertes pour les positions de R ;
+  \item l'utilisation exclusive du signal \RR{}, qui ignore la morphologie ;
+  \item un nombre limité de jeux de données externes pour l'évaluation de la robustesse.
+\end{itemize}
+
+% --- 6.4 Perspectives -----------------------------------------------
+\section{Perspectives}
+\label{sec:concl:perspectives}
+
+Plusieurs extensions de ce travail sont envisagées.
+
+\textbf{Court terme.}
+\begin{itemize}
+  \item Réaliser un déploiement de l'application sur Streamlit Community Cloud pour rendre la démonstration accessible publiquement.
+  \item Compléter les ré-exports des figures en \texttt{.pdf} 300 dpi pour la qualité d'impression du présent mémoire.
+\end{itemize}
+
+\textbf{Moyen terme.}
+\begin{itemize}
+  \item Ajouter une seconde branche d'entrée portant la morphologie de l'\ECG{} (onde P, complexe QRS), afin de tester l'hypothèse du plateau intrinsèque.
+  \item Évaluer le modèle final sur d'autres jeux de données publics (CPSC2018, Icentia11k) pour étendre la mesure de robustesse.
+\end{itemize}
+
+\textbf{Long terme.}
+\begin{itemize}
+  \item Industrialiser le pipeline avec un test prospectif sur un dispositif embarqué (microcontrôleur ARM Cortex-M, par exemple).
+  \item Étudier une approche d'\emph{adaptation de domaine} (fine-tuning court par patient ou par dataset cible) pour combler l'écart cross-dataset.
+\end{itemize}

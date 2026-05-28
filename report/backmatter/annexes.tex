@@ -1,0 +1,59 @@
+% =====================================================================
+%  Annexes (Buttler) : éléments externes au rapport, lecture optionnelle.
+% =====================================================================
+
+\chapter{Liste des hyperparamètres optimisés}
+\label{ann:hyperparams}
+
+Le tableau suivant détaille l'espace de recherche utilisé par Optuna en phase~3.
+
+\begin{table}[H]
+  \centering
+  \caption{Espace de recherche Optuna.}
+  \label{tab:ann:optuna}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Hyperparamètre} & \textbf{Plage} & \textbf{Type} \\
+    \midrule
+    Taille de fenêtre \(W\)        & [30, 60, 90, 120] & catégoriel \\
+    Filtres conv. couche 1         & [16, 32, 64]      & catégoriel \\
+    Filtres conv. couche 2         & [32, 64, 128]     & catégoriel \\
+    Unités LSTM                    & [32, 64, 128]     & catégoriel \\
+    Dropout                        & [0,1 ; 0,5]       & continu (log) \\
+    Taux d'apprentissage           & [1e-5 ; 1e-3]     & continu (log) \\
+    Taille de \textit{batch}       & [32, 64, 128]     & catégoriel \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\chapter{Reproductibilité et code source}
+\label{ann:reproductibilite}
+
+Le code complet du projet est disponible publiquement à l'adresse suivante :
+
+\medskip
+\centerline{\url{[À COMPLÉTER : URL du dépôt GitHub]}}
+\medskip
+
+Le fichier \texttt{requirements-lock.txt} fixe les versions exactes des bibliothèques utilisées. La commande \texttt{make demo} lance l'application interactive en local après installation des dépendances.
+
+\chapter{Captures d'écran complémentaires}
+\label{ann:screenshots}
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.8\linewidth][5cm]{Capture — onglet Model Showdown}
+  \caption{Onglet \emph{Model Showdown} de l'application interactive.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.8\linewidth][5cm]{Capture — onglet Compression Lab}
+  \caption{Onglet \emph{Compression Lab}.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.8\linewidth][5cm]{Capture — onglet What-If}
+  \caption{Onglet \emph{What-If}.}
+\end{figure}

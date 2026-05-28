@@ -1,0 +1,72 @@
+% =====================================================================
+%  Chapitre 5 — Discussion
+%  Règles (Sayadi/Buttler) :
+%   - temps : présent
+%   - trier les faits par importance, démonstration
+%   - comparer à la littérature
+%   - identifier limitations
+%   - transitions claires entre paragraphes
+% =====================================================================
+\chapter{Discussion}
+\label{ch:discussion}
+
+% --- 5.1 Synthèse des résultats principaux ---------------------------
+\section{Synthèse des résultats principaux}
+\label{sec:disc:synthese}
+
+Les trois résultats centraux de ce travail sont les suivants.
+
+\textbf{Premièrement}, sous une évaluation patient-level rigoureuse, toutes les méthodes — qu'elles soient classiques ou profondes — convergent vers un \(F_1\) compris entre \texttt{[0,XX]} et \texttt{[0,XX]}. Ce constat suggère l'existence d'un plafond intrinsèque au signal \RR{} seul.
+
+\textbf{Deuxièmement}, l'architecture \CNN--\LSTM{} optimisée par Optuna n'a apporté qu'un gain limité sur ce plafond, tout en bénéficiant d'une marge importante en compression : la variante INT8 a atteint 87~KB sans dégradation significative.
+
+\textbf{Troisièmement}, le transfert AFDB~$\rightarrow$~LTAFDB s'est traduit par une perte de \texttt{[XX]} points, confirmant que la généralisation cross-dataset reste un point dur.
+
+% --- 5.2 Comparaison à la littérature -------------------------------
+\section{Comparaison à la littérature}
+\label{sec:disc:litterature}
+
+La performance brute obtenue (\(F_1 \approx \texttt{[XX]}\) sur AFDB) reste inférieure aux valeurs typiquement annoncées dans la littérature, qui dépassent souvent 0,95 \cite{andersen2019deep,hannun2019cardiologist}. Cet écart trouve une explication méthodologique.
+
+La plupart des travaux rapportent une performance \keyword{par fenêtre} après mélange des fenêtres de tous les patients, ce qui crée une fuite : la même série temporelle apparaît à la fois en entraînement et en test. Une évaluation patient-level — adoptée dans ce mémoire — fait disparaître cette fuite et révèle une difficulté qui n'apparaît pas dans une évaluation par fenêtre.
+
+Lorsque l'on bascule l'évaluation \emph{de ce même modèle} en mode fenêtre, on retrouve des chiffres comparables à la littérature ; la différence n'est donc pas due à l'architecture, mais bien au protocole d'évaluation.
+
+% --- 5.3 Étude de compression ---------------------------------------
+\section{Compression : un compromis favorable}
+\label{sec:disc:compression}
+
+La table~\ref{tab:res:compression} a montré que la quantification statique INT8 réduit la taille du modèle d'un facteur d'environ \texttt{[XX]} sans pénaliser de plus de \texttt{[XX]} points le \(F_1\). Ce résultat ouvre la voie à un déploiement sur dispositif portable.
+
+Trois pièges méthodologiques ont été rencontrés et méritent d'être signalés :
+\begin{enumerate}[leftmargin=*]
+  \item le \emph{pruning seul ne réduit pas la taille du fichier} tant que les zéros ne sont pas effectivement supprimés du tenseur ;
+  \item le \emph{masque de pruning} doit être figé avant le fine-tuning, sans quoi la sparsité est détruite ;
+  \item l'\emph{export ONNX} avec données externes peut paradoxalement augmenter la taille totale si le format n'est pas explicité.
+\end{enumerate}
+
+% --- 5.4 Cross-dataset ----------------------------------------------
+\section{Cross-dataset : un plateau intrinsèque}
+\label{sec:disc:cross}
+
+La perte cross-dataset observée n'est pas anecdotique. Elle s'explique principalement par deux facteurs :
+\begin{itemize}
+  \item la \textbf{distribution des durées d'épisodes} est différente entre AFDB (épisodes courts fréquents) et LTAFDB (épisodes longs et soutenus) ;
+  \item la \textbf{fréquence d'échantillonnage} est différente (250~Hz contre 128~Hz), ce qui modifie la résolution des intervalles \RR{}.
+\end{itemize}
+
+L'écart entre une cible métier ambitieuse (\(F_1 \geq 0{,}95\)) et le plafond observé (\(F_1 \approx 0{,}75\text{--}0{,}80\)) traduit la limite de l'information portée par les \RR{} seuls : sans la morphologie de l'\ECG{}, certains épisodes restent indissociables d'un rythme sinusal irrégulier.
+
+% --- 5.5 Limitations ------------------------------------------------
+\section{Limitations}
+\label{sec:disc:limites}
+
+Le présent travail comporte plusieurs limitations.
+
+\textbf{Données.} L'effectif d'AFDB est restreint (25~patients) et n'est pas représentatif de la diversité des conditions cliniques rencontrées en pratique.
+
+\textbf{Annotations.} Les positions d'ondes R ont été extraites des annotations expertes ; un détecteur de R automatique introduirait un biais supplémentaire en conditions réelles.
+
+\textbf{Information utilisée.} L'utilisation des seuls intervalles \RR{}, choisie pour sa simplicité de déploiement, exclut par construction la morphologie de l'onde P.
+
+\textbf{Évaluation.} L'évaluation s'est concentrée sur deux jeux de données ; un transfert vers des bases supplémentaires (CPSC2018, Icentia11k, etc.) reste à effectuer.

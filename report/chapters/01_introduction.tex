@@ -1,0 +1,70 @@
+% =====================================================================
+%  Chapitre 1 — Introduction
+%  Règles (Sayadi + Buttler) :
+%   - temps : présent
+%   - structure entonnoir : contexte → état de l'art bref (chaque travail
+%     cité en quelques lignes avec [n]) → problème → objectifs →
+%     contributions → plan chapitre par chapitre.
+% =====================================================================
+\chapter{Introduction}
+\label{ch:intro}
+
+% --- 1.1 Contexte général --------------------------------------------
+\section{Contexte général}
+\label{sec:intro:contexte}
+
+La fibrillation auriculaire (\FA{}) est l'arythmie cardiaque soutenue la plus fréquente. Elle multiplie par cinq le risque d'accident vasculaire cérébral et constitue une cause majeure d'hospitalisation \cite{hindricks2021guidelines}. Son diagnostic repose sur l'électrocardiogramme (\ECG{}), enregistré soit en cabinet, soit en continu à l'aide d'enregistreurs ambulatoires de type \textit{Holter}.
+
+L'analyse manuelle de tels enregistrements, qui peuvent dépasser vingt-quatre heures, demeure chronophage. Les progrès récents en \keyword{apprentissage profond} ont ouvert la voie à des outils d'aide à la décision capables de signaler automatiquement les épisodes de \FA{}. Parmi les caractéristiques utilisables, les \keyword{intervalles \RR{}} — durées entre deux battements consécutifs — présentent un intérêt particulier : ils se calculent à partir d'un seul point de référence (l'onde R) et restent robustes au bruit et aux variations d'amplitude du signal \ECG{}.
+
+% --- 1.2 État de l'art (synthétique) ---------------------------------
+\section{État de l'art en bref}
+\label{sec:intro:soa}
+
+Plusieurs familles de méthodes ont été proposées dans la littérature.
+
+Les approches classiques reposent sur des descripteurs statistiques de la série \RR{} suivis d'un classifieur supervisé : \citeauthor{tateno2001automatic} exploitent un test de coefficient de variation et la matrice de transition des \RR{} \cite{tateno2001automatic} ; \citeauthor{lake2011accurate} utilisent une entropie multi-échelle pour la détection \cite{lake2011accurate}.
+
+Les approches profondes récentes traitent directement le signal \ECG{} brut. \citeauthor{hannun2019cardiologist} ont entraîné un \CNN{} à 34 couches sur plus de 90~000 \ECG{} ambulatoires et atteint un \AUROC{} de 0{,}97 \cite{hannun2019cardiologist}. Sur le seul signal \RR{}, \citeauthor{andersen2019deep} proposent une architecture hybride \CNN--\LSTM{} et rapportent une sensibilité supérieure à 98~\% en classification de fenêtre \cite{andersen2019deep}.
+
+La question de la \keyword{robustesse cross-dataset} — c'est-à-dire le maintien des performances d'un modèle entraîné sur un jeu de données et évalué sur un autre — est, en revanche, peu étudiée. De même, la contrainte de \keyword{compacité} requise pour un déploiement embarqué n'est pas systématiquement examinée.
+
+% --- 1.3 Problématique & objectifs -----------------------------------
+\section{Problématique et objectifs}
+\label{sec:intro:objectifs}
+
+Ce travail s'intéresse à la détection automatique de la \FA{} \textbf{à partir des seuls intervalles \RR{}}, en respectant trois exigences pratiques :
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Évaluation honnête} : isoler la difficulté intrinsèque du problème par une validation croisée à l'échelle du \emph{patient}, et non de la fenêtre.
+  \item \textbf{Compacité} : produire un modèle final dont la taille permet un déploiement sur dispositif portable.
+  \item \textbf{Robustesse} : quantifier la perte de performance lors d'un transfert vers un jeu de données acquis dans des conditions cliniques différentes.
+\end{enumerate}
+
+% --- 1.4 Contributions -----------------------------------------------
+\section{Contributions}
+\label{sec:intro:contributions}
+
+Ce mémoire apporte les contributions suivantes :
+\begin{itemize}[leftmargin=*]
+  \item Une étude comparative de quatre familles de classifieurs (règle métier, gradient boosting, \CNN{} 1D, \CNN--\LSTM{}) sous protocole patient-level identique.
+  \item Une architecture \CNN--\LSTM{} optimisée par \textit{Optuna} avec analyse d'ablation systématique.
+  \item Une étude de compression couvrant huit variantes (pruning, quantification dynamique et INT8, export ONNX) avec analyse des compromis taille / latence / performance.
+  \item Une évaluation cross-dataset \textbf{AFDB~$\rightarrow$~LTAFDB} mettant en évidence un plateau intrinsèque au signal \RR{} seul.
+  \item Un tableau de bord interactif \textit{Streamlit} permettant l'exploration patient par patient des décisions du modèle.
+\end{itemize}
+
+% --- 1.5 Plan du mémoire (obligatoire — Sayadi 1) --------------------
+\section{Plan du mémoire}
+\label{sec:intro:plan}
+
+Le présent document est organisé en six chapitres.
+
+Le \textbf{chapitre~\ref{ch:soa}} présente l'état de l'art en détection automatique de la \FA{} : éléments cliniques, jeux de données publics et approches algorithmiques.
+
+Le \textbf{chapitre~\ref{ch:methodes}} décrit la méthodologie adoptée : pipeline de prétraitement, architecture proposée, protocole d'évaluation à l'échelle du patient et critères statistiques (\VP{}, \VN{}, \FP{}, \FN{}, précision, rappel, F1, courbe ROC).
+
+Le \textbf{chapitre~\ref{ch:resultats}} rapporte les résultats expérimentaux des six phases du projet : exploration des données, baselines, modèle \CNN--\LSTM{}, étude de compression, robustesse cross-dataset et application interactive.
+
+Le \textbf{chapitre~\ref{ch:discussion}} discute ces résultats, les compare à la littérature et identifie les limites du travail.
+
+Le \textbf{chapitre~\ref{ch:conclusion}} conclut le mémoire et propose plusieurs perspectives.

@@ -1,0 +1,64 @@
+% =====================================================================
+%  Packages
+% =====================================================================
+
+% ----- Langue & encodage ---------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{csquotes}                 % requis par biblatex avec babel
+
+% ----- Police Times-like (substitut libre de Times New Roman) --------
+\usepackage{newtxtext}                % corps de texte
+\usepackage{newtxmath}                % équations cohérentes avec Times
+
+% ----- Mise en page --------------------------------------------------
+\usepackage[a4paper,margin=25mm]{geometry}   % marges 25 mm (Sayadi)
+\usepackage{setspace}                         % interligne 1.5
+\usepackage{indentfirst}                      % premier paragraphe indenté
+\usepackage{parskip}                          % petite espace entre paragraphes
+
+% ----- Graphiques ----------------------------------------------------
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{tikz}                            % placeholders figures
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,calc}
+\usepackage{float}                            % option [H] pour figures/tableaux
+
+% ----- Tableaux ------------------------------------------------------
+\usepackage{booktabs}                         % règles propres : \toprule \midrule
+\usepackage{array}                            % colonnes avancées
+\usepackage{tabularx}                         % colonnes auto-ajustées
+\usepackage{multirow}
+\usepackage{caption}
+\captionsetup[figure]{labelfont=bf,font=small}
+\captionsetup[table]{labelfont=bf,font=small,position=above}
+
+% ----- Mathématiques -------------------------------------------------
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+\usepackage{siunitx}                          % unités cohérentes (\SI{0.95}{})
+
+% ----- Algorithmes (encadrés avec titre, sans \fbox) ------------------
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% ----- Hyperliens ----------------------------------------------------
+\usepackage[hidelinks,breaklinks=true]{hyperref}
+\usepackage{url}
+
+% ----- Bibliographie (style IEEE, ordre de citation) -----------------
+\usepackage[
+  backend=biber,
+  style=ieee,
+  sorting=none,
+  doi=false,isbn=false,url=false
+]{biblatex}
+
+% ----- En-tête / pied de page ----------------------------------------
+\usepackage{fancyhdr}
+
+% ----- Listes & divers -----------------------------------------------
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{lipsum}                           % texte fictif — à retirer en production

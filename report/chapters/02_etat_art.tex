@@ -1,0 +1,102 @@
+% =====================================================================
+%  Chapitre 2 — État de l'art
+%  Règles (Sayadi/Buttler) :
+%   - structure : du général au particulier, transitions entre parties
+%   - chaque travail cité = quelques lignes + [n]
+%   - temps : présent (faits établis), passé (allusions aux travaux)
+% =====================================================================
+\chapter{État de l'art}
+\label{ch:soa}
+
+% --- 2.1 Rappels cliniques -------------------------------------------
+\section{Rappels cliniques sur la fibrillation auriculaire}
+\label{sec:soa:clinique}
+
+\subsection{Définition et impact}
+La \FA{} se caractérise par une activité électrique désorganisée des oreillettes, entraînant un rythme ventriculaire irrégulier. Sa prévalence augmente avec l'âge et atteint près de 10~\% au-delà de 80~ans \cite{hindricks2021guidelines}.
+
+\subsection{Signature électrocardiographique}
+Sur l'\ECG{}, la \FA{} se traduit par trois signes principaux :
+\begin{itemize}
+  \item l'\textbf{absence d'onde P} ;
+  \item la présence d'oscillations dites \textbf{de fibrillation} ;
+  \item une \textbf{irrégularité des intervalles \RR{}}.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \figplaceholder[0.85\linewidth][6cm]{ECG en rythme sinusal vs ECG en FA — illustration des trois signes}
+  \caption{Exemples d'\ECG{} en rythme sinusal (haut) et en fibrillation auriculaire (bas). L'absence d'onde P et l'irrégularité des intervalles \RR{} sont caractéristiques de la \FA{}.}
+  \label{fig:soa:ecg_fa}
+\end{figure}
+
+% --- 2.2 Signal RR ---------------------------------------------------
+\section{Le signal \RR{} comme entrée monodimensionnelle}
+\label{sec:soa:rr}
+
+\subsection{Définition}
+L'intervalle \RR{} désigne la durée séparant deux ondes R consécutives, c'est-à-dire deux contractions ventriculaires. La suite des intervalles \RR{} forme un \keyword{tachogramme} qui résume l'information de rythme indépendamment de la morphologie de l'\ECG{}.
+
+\subsection{Avantages et limites}
+L'analyse fondée sur les \RR{} présente plusieurs avantages :
+\begin{itemize}
+  \item robustesse au bruit basse fréquence et aux variations d'amplitude ;
+  \item faible coût computationnel ;
+  \item compatibilité avec les capteurs portables.
+\end{itemize}
+Elle souffre toutefois d'une limite intrinsèque : elle ignore la morphologie de l'onde P, dont l'absence est pourtant un marqueur direct de la \FA{}.
+
+% --- 2.3 Jeux de données ---------------------------------------------
+\section{Jeux de données publics}
+\label{sec:soa:datasets}
+
+\subsection{MIT-BIH Atrial Fibrillation Database (AFDB)}
+La base AFDB \cite{moody1983new} contient 25~enregistrements \ECG{} ambulatoires de 10~heures, échantillonnés à 250~Hz, annotés battement par battement. Elle est devenue le \textit{benchmark} de référence pour la détection de la \FA{}.
+
+\subsection{Long-Term AF Database (LTAFDB)}
+La base LTAFDB \cite{petrutiu2007abrupt} contient 84~enregistrements de 24 à 25~heures, acquis dans des conditions cliniques différentes. Elle est utilisée dans ce travail comme jeu de test \emph{externe} pour évaluer la robustesse cross-dataset.
+
+\begin{table}[H]
+  \centering
+  \caption{Caractéristiques des deux bases utilisées dans ce mémoire.}
+  \label{tab:soa:datasets}
+  \begin{tabular}{lcc}
+    \toprule
+    & \textbf{AFDB} & \textbf{LTAFDB} \\
+    \midrule
+    Nombre de patients          & 25 & 84 \\
+    Durée par enregistrement    & 10 h & 24--25 h \\
+    Fréquence d'échantillonnage & 250 Hz & 128 Hz \\
+    Annotations                 & battement & battement \\
+    Usage dans ce mémoire       & train / val / test & test externe \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% --- 2.4 Approches algorithmiques ------------------------------------
+\section{Approches algorithmiques pour la détection de la \FA{}}
+\label{sec:soa:approches}
+
+\subsection{Méthodes statistiques}
+Les premières approches ont exploité des descripteurs statistiques de la série \RR{} : coefficient de variation, racine de la moyenne des carrés des différences successives (RMSSD), entropie de Shannon, entropie multi-échelle \cite{tateno2001automatic,lake2011accurate}.
+
+\subsection{Apprentissage automatique classique}
+Avec l'essor de l'apprentissage automatique, ces descripteurs ont alimenté des classifieurs supervisés tels que les forêts aléatoires et le gradient boosting \cite{XX_baseline_gb}.
+
+\subsection{Apprentissage profond sur \ECG{} brut}
+Les architectures profondes appliquées directement au signal \ECG{} ont récemment atteint une performance comparable à celle d'un cardiologue \cite{hannun2019cardiologist}.
+
+\subsection{Apprentissage profond sur intervalles \RR{}}
+Plus pertinents pour ce mémoire, les travaux ciblant le seul signal \RR{} reposent généralement sur des architectures hybrides combinant convolutions 1D et couches récurrentes \cite{andersen2019deep}.
+
+% --- 2.5 Synthèse & positionnement -----------------------------------
+\section{Synthèse et positionnement}
+\label{sec:soa:positionnement}
+
+La littérature révèle trois éléments insuffisamment traités :
+\begin{enumerate}[leftmargin=*]
+  \item l'\textbf{évaluation à l'échelle du patient}, souvent remplacée par une évaluation par fenêtre, qui surestime la performance ;
+  \item l'\textbf{empreinte mémoire} du modèle final, rarement rapportée ;
+  \item la \textbf{généralisation cross-dataset}, peu étudiée.
+\end{enumerate}
+Le présent travail se positionne précisément sur ces trois axes.
