@@ -18,7 +18,7 @@ La répartition de la prévalence de la \FA{} parmi les 25~patients d'AFDB est r
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][6cm]{Histogramme + boîte à moustaches de la prévalence FA par patient (AFDB)}
+  \includegraphics[width=0.85\linewidth]{figures/03_class_imbalance_per_patient.pdf}
   \caption{Distribution de la prévalence de la \FA{} par patient dans la base AFDB.}
   \label{fig:res:prevalence}
 \end{figure}
@@ -28,7 +28,7 @@ Les distributions conditionnelles des \RR{} en rythme sinusal et en \FA{} sont p
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][6cm]{Densités RR : rythme sinusal vs FA (kernel density estimate)}
+  \includegraphics[width=0.85\linewidth]{figures/02_rr_distribution.pdf}
   \caption{Densités des intervalles \RR{} conditionnellement au rythme.}
   \label{fig:res:rr_dist}
 \end{figure}
@@ -66,7 +66,7 @@ Optuna a exploré \texttt{[XX]} essais sur \texttt{[XX]} heures. La distribution
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][6cm]{Diagramme Optuna : importance des hyperparamètres + scatter score vs nombre d'essais}
+  \includegraphics[width=0.85\linewidth]{figures/10_optuna_search.pdf}
   \caption{Résultats de la recherche bayésienne par \textit{Optuna}.}
   \label{fig:res:optuna}
 \end{figure}
@@ -96,7 +96,7 @@ Une étude d'ablation a été menée pour quantifier la contribution de chaque c
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][6cm]{Barplot ablation : F1 obtenu en retirant chaque composant (régularisation, BiLSTM, dropout, etc.)}
+  \includegraphics[width=0.85\linewidth]{figures/12_phase3_ablation.pdf}
   \caption{Étude d'ablation des composants du modèle.}
   \label{fig:res:ablation}
 \end{figure}
@@ -131,7 +131,7 @@ La variante V4 a atteint la cible des 200~KB visée pour l'embarqué (87~KB obte
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][6cm]{Frontière Pareto : F1 vs taille pour les 8 variantes}
+  \includegraphics[width=0.85\linewidth]{figures/17_phase4b_size_vs_f1.pdf}
   \caption{Compromis taille / performance des variantes de compression.}
   \label{fig:res:pareto}
 \end{figure}
@@ -161,7 +161,7 @@ La perte cross-dataset observée est de \texttt{[XX]} points de \(F_1\). La figu
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][6cm]{Boîtes à moustaches F1/patient : AFDB vs LTAFDB côte à côte}
+  \includegraphics[width=0.85\linewidth]{figures/18_phase5_perpatient_box.pdf}
   \caption{Dispersion inter-patient sur les deux jeux de données.}
   \label{fig:res:boxplot_cross}
 \end{figure}

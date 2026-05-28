@@ -3,12 +3,14 @@
 > Snapshot of every committed PNG in `reports/figures/` with its current resolution
 > and a recommended action for the thesis report.
 >
-> Generated 2026-05-28 from `file <png>`. ImageMagick (`identify`) was not
-> installed at the time of the audit, so DPI metadata wasn't queried.
-> Matplotlib defaults to 100 dpi → all current figures were exported as
-> screen-resolution PNGs, **not** print-resolution PDFs. For a LaTeX report,
-> the recommendation is to re-export at 300 dpi PDF (vector preferred where
-> possible).
+> **Status 2026-05-28 (updated):** the wrap path was chosen. Every PNG has been
+> embedded into a same-name `.pdf` in `report/figures/` via
+> `scripts/png_to_pdf.py` (Pillow, lossless, declared 300 dpi resolution).
+> The LaTeX memoir now `\includegraphics{...pdf}` directly; the six clearest
+> matches are already wired in `report/chapters/04_resultats.tex`. The
+> remaining 22 PDFs are available for the user to insert as needed. A future
+> notebook re-run with a `save_fig` utility would replace these raster-wrapped
+> PDFs with true vector PDFs, but is not blocking the report.
 
 ## Re-export pattern (matplotlib)
 
