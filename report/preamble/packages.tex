@@ -35,7 +35,9 @@
 \captionsetup[table]{labelfont=bf,font=small,position=above}
 
 % ----- Mathématiques -------------------------------------------------
-\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{amsmath,amsfonts}
+\let\Bbbk\relax                               % évite le conflit avec newtxmath
+\usepackage{amssymb}
 \usepackage{mathtools}
 \usepackage{siunitx}                          % unités cohérentes (\SI{0.95}{})
 
