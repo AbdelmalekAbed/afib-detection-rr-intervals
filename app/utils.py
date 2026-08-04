@@ -5,7 +5,6 @@ import io
 import json
 import sys
 import time
-from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +16,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.baselines.cv import zscore_per_window
 from src.models.cnn_lstm import CNNLSTM
 
 REPORTS = PROJECT_ROOT / "reports"
@@ -42,7 +40,7 @@ def load_oof_npz(name: str) -> dict:
     if not path.exists():
         return {}
     d = np.load(path, allow_pickle=True)
-    return {k: d[k] for k in d.keys()}
+    return {k: d[k] for k in d}
 
 
 @st.cache_data(show_spinner=False)
@@ -80,7 +78,7 @@ def load_source_model() -> tuple[nn.Module, dict]:
     """Load the Phase 5 AFDB source model — the one trained on all AFDB
     that generalizes to LTAFDB zero-shot at F1/patient=0.71."""
     raw = json.loads((REPORTS / "phase35_best_params.json").read_text())
-    best = raw["best_params"] if "best_params" in raw else raw
+    best = raw.get("best_params", raw)
     model = make_model(best, WINDOW)
     state = torch.load(CKPT / "phase5_source_afdb.pt", map_location="cpu", weights_only=True)
     model.load_state_dict(state)
@@ -224,7 +222,7 @@ def get_demo_patients_afdb():
     groups = oof["groups"]
     y = oof["y"]
     patients = {}
-    variant_keys = [k for k in oof.keys() if k not in {"y", "groups", "fold"}]
+    variant_keys = [k for k in oof if k not in {"y", "groups", "fold"}]
     for pid in np.unique(groups):
         m = groups == pid
         rec = {
@@ -251,6 +249,6 @@ def header(title: str, subtitle: str = ""):
 def kpi_row(items: list[tuple[str, str, str | None]]):
     """Render N KPI cards in a row. Each item = (label, value, delta or None)."""
     cols = st.columns(len(items))
-    for col, (label, value, delta) in zip(cols, items):
+    for col, (label, value, delta) in zip(cols, items, strict=True):
         with col:
             st.metric(label, value, delta)

@@ -10,63 +10,96 @@
 \chapter{Discussion}
 \label{ch:discussion}
 
+\section{Introduction}
+\label{sec:disc:intro}
+Ce chapitre interprète les résultats du chapitre~\ref{ch:resultats}. Il dégage d'abord les quatre enseignements principaux du travail, les confronte ensuite à la littérature en expliquant l'écart de performance par le protocole d'évaluation, revient sur le compromis favorable de la compression et sur la robustesse cross-dataset, décompose ce que recouvre réellement la notion de plafond, avant d'exposer honnêtement les limites de l'étude.
+
 % --- 5.1 Synthèse des résultats principaux ---------------------------
 \section{Synthèse des résultats principaux}
 \label{sec:disc:synthese}
 
-Les trois résultats centraux de ce travail sont les suivants.
+Les quatre résultats centraux de ce travail sont les suivants.
 
-\textbf{Premièrement}, sous une évaluation patient-level rigoureuse, toutes les méthodes — qu'elles soient classiques ou profondes — convergent vers un \(F_1\) compris entre \texttt{[0,XX]} et \texttt{[0,XX]}. Ce constat suggère l'existence d'un plafond intrinsèque au signal \RR{} seul.
+\textbf{Premièrement}, sous une évaluation à l'échelle du patient, les méthodes ne se valent pas, et l'écart est statistiquement établi. Les classifieurs exploitant des descripteurs \keyword{HRV} atteignent les meilleurs \(F_1\) par patient (0,850 pour la forêt aléatoire, 0,883 pour le gradient boosting), tandis que les modèles opérant sur la séquence \RR{} brute restent plus bas (0,631--0,717). Le \CNN--\LSTM{} hybride proposé (0,717) est le meilleur de cette seconde famille — il dépasse ses composantes \CNN{} et \LSTM{} prises isolément — sans rejoindre les arbres sur descripteurs HRV. La comparaison appariée conduite en section~\ref{sec:res:incertitude} donne à ce constat une base solide : la différence moyenne de \(F_1\) patient par patient vaut \(+0{,}167\) en faveur du gradient boosting, avec un intervalle de confiance à 95~\% de \([+0{,}076 ;\ +0{,}272]\), et l'avantage se vérifie sur 20~patients sur 23.
 
-\textbf{Deuxièmement}, l'architecture \CNN--\LSTM{} optimisée par Optuna n'a apporté qu'un gain limité sur ce plafond, tout en bénéficiant d'une marge importante en compression : la variante INT8 a atteint 87~KB sans dégradation significative.
+\textbf{Deuxièmement}, cet écart a une cause identifiée, et elle n'est pas celle que l'on suppose spontanément. Sur les patients dont plus de 10~\% de l'enregistrement est en \FA{}, les deux familles sont proches (0,942 contre 0,855). C'est sur les patients à faible charge que le réseau décroche : 0,457 contre 0,773, soit plus de trente points d'écart. La difficulté du modèle profond n'est donc pas de reconnaître la \FA{}, mais de rester \emph{spécifique} lorsque les épisodes sont rares.
 
-\textbf{Troisièmement}, le transfert AFDB~$\rightarrow$~LTAFDB s'est traduit par une perte de \texttt{[XX]} points, confirmant que la généralisation cross-dataset reste un point dur.
+\textbf{Troisièmement}, l'intérêt du modèle profond ne réside pas dans le \(F_1\) brut mais dans son profil de déploiement : un traitement de bout en bout sans descripteurs manuels, un pouvoir discriminant élevé et indépendant du seuil (\AUROC{} de 0,971) et surtout une compression très favorable — la quantification INT8 ramène le modèle compact à 87~KB sans aucune dégradation.
+
+\textbf{Quatrièmement}, le transfert AFDB~$\rightarrow$~LTAFDB ne s'accompagne pas d'effondrement : 0,713 en \textit{zero-shot} contre 0,765 pour un modèle entraîné directement sur LTAFDB, soit cinq points d'écart seulement malgré un changement complet de conditions d'acquisition.
 
 % --- 5.2 Comparaison à la littérature -------------------------------
 \section{Comparaison à la littérature}
 \label{sec:disc:litterature}
 
-La performance brute obtenue (\(F_1 \approx \texttt{[XX]}\) sur AFDB) reste inférieure aux valeurs typiquement annoncées dans la littérature, qui dépassent souvent 0,95 \cite{andersen2019deep,hannun2019cardiologist}. Cet écart trouve une explication méthodologique.
+La performance par patient obtenue (\(F_1\) de 0,717 pour le modèle profond, jusqu'à 0,883 pour le gradient boosting) reste inférieure aux valeurs souvent annoncées dans la littérature, qui dépassent fréquemment 0,95 \cite{andersen2019deep,hannun2019cardiologist,faust2018automated}. Cet écart trouve une explication méthodologique nette, et il serait trompeur de le lire comme une infériorité du présent travail.
 
-La plupart des travaux rapportent une performance \keyword{par fenêtre} après mélange des fenêtres de tous les patients, ce qui crée une fuite : la même série temporelle apparaît à la fois en entraînement et en test. Une évaluation patient-level — adoptée dans ce mémoire — fait disparaître cette fuite et révèle une difficulté qui n'apparaît pas dans une évaluation par fenêtre.
+Deux différences de protocole se cumulent. La première tient à l'unité d'évaluation : la plupart des travaux rapportent une performance \keyword{par fenêtre}, c'est-à-dire une moyenne sur l'ensemble des fenêtres confondues, dominée de fait par les patients qui en fournissent le plus. La seconde, plus grave, tient au découpage : lorsque les fenêtres sont mélangées avant d'être réparties entre apprentissage et test, les fenêtres d'un même patient se retrouvent des deux côtés. Comme le tachogramme d'un sujet possède une signature propre — fréquence cardiaque de repos, amplitude de la variabilité respiratoire —, le modèle peut alors reconnaître le \emph{patient} plutôt que le rythme. Le protocole adopté ici supprime les deux biais.
 
-Lorsque l'on bascule l'évaluation \emph{de ce même modèle} en mode fenêtre, on retrouve des chiffres comparables à la littérature ; la différence n'est donc pas due à l'architecture, mais bien au protocole d'évaluation.
+Le constat est direct dans nos propres mesures, et il est résumé à la figure~\ref{fig:res:winvspat}. \emph{Au niveau de la fenêtre}, le gradient boosting atteint un \(F_1\) de 0,953 et le \CNN--\LSTM{} de 0,894 — des chiffres tout à fait comparables à ceux de la littérature —, alors que ces mêmes prédictions, agrégées \emph{par patient}, tombent respectivement à 0,883 et 0,717. Ni le modèle, ni les données, ni même les scores prédits ne changent entre les deux colonnes : seule change la façon de compter. L'écart avec la littérature ne tient donc pas à l'architecture, mais au protocole d'évaluation.
+
+Cette observation rejoint un constat plus général formulé dans la littérature méthodologique sur l'apprentissage appliqué aux signaux physiologiques \cite{saeb2017need} : lorsque plusieurs enregistrements proviennent d'un même sujet, un découpage qui ignore cette structure produit des estimations de performance systématiquement optimistes, parfois de plusieurs dizaines de points.
 
 % --- 5.3 Étude de compression ---------------------------------------
 \section{Compression : un compromis favorable}
 \label{sec:disc:compression}
 
-La table~\ref{tab:res:compression} a montré que la quantification statique INT8 réduit la taille du modèle d'un facteur d'environ \texttt{[XX]} sans pénaliser de plus de \texttt{[XX]} points le \(F_1\). Ce résultat ouvre la voie à un déploiement sur dispositif portable.
+La table~\ref{tab:res:compression} a montré que la quantification INT8 réduit la taille du modèle compact de 133 à 87~KB — et de 403 à 87~KB par rapport à l'architecture à 100\,k paramètres — \emph{sans aucune perte} de \(F_1\) par patient. Ce résultat ouvre la voie à un déploiement sur dispositif portable.
 
-Trois pièges méthodologiques ont été rencontrés et méritent d'être signalés :
-\begin{enumerate}[leftmargin=*]
-  \item le \emph{pruning seul ne réduit pas la taille du fichier} tant que les zéros ne sont pas effectivement supprimés du tenseur ;
-  \item le \emph{masque de pruning} doit être figé avant le fine-tuning, sans quoi la sparsité est détruite ;
-  \item l'\emph{export ONNX} avec données externes peut paradoxalement augmenter la taille totale si le format n'est pas explicité.
-\end{enumerate}
+Ce constat, à lui seul, mérite d'être souligné : sur les huit variantes évaluées, aucune ne réalise un compromis meilleur que la quantification INT8 seule. L'élagage, quel que soit son taux, laisse la taille du fichier inchangée tant que les zéros ne sont pas physiquement retirés du tenseur ; poussé à 70~\%, il coûte 8,6~points de \(F_1\) par patient, qu'un ré-entraînement court suffit certes à récupérer intégralement, mais sans aucun bénéfice en taille. Autrement dit, dans ce contexte, la complexité supplémentaire de l'élagage n'est pas rentable — un résultat négatif, mais utile.
+
+L'écart entre la parcimonie \emph{annoncée} et le gain de taille \emph{obtenu} illustre plus largement les pièges décrits à la section~\ref{sec:meth:modeles} : ce sont trois erreurs faciles à commettre, et surtout silencieuses, en ce qu'elles produisent des tableaux d'apparence cohérente.
+
+Une réserve, enfin, sur la portée de ces mesures. Les 87~KB sont une taille de fichier sérialisé, et les latences ont été relevées sur un processeur d'ordinateur portable. Un déploiement réel sur microcontrôleur imposerait des contraintes supplémentaires — mémoire vive disponible pendant l'inférence, absence de bibliothèque d'algèbre optimisée, budget énergétique — que ce travail n'aborde pas.
 
 % --- 5.4 Cross-dataset ----------------------------------------------
-\section{Cross-dataset : un plateau intrinsèque}
+\section{Cross-dataset : robustesse et plafond intrinsèque}
 \label{sec:disc:cross}
 
-La perte cross-dataset observée n'est pas anecdotique. Elle s'explique principalement par deux facteurs :
+Le transfert vers LTAFDB ne dégrade pas le \(F_1\) par patient, alors même que les deux bases diffèrent par deux facteurs importants :
 \begin{itemize}
-  \item la \textbf{distribution des durées d'épisodes} est différente entre AFDB (épisodes courts fréquents) et LTAFDB (épisodes longs et soutenus) ;
-  \item la \textbf{fréquence d'échantillonnage} est différente (250~Hz contre 128~Hz), ce qui modifie la résolution des intervalles \RR{}.
+  \item la \textbf{distribution des durées d'épisodes} (épisodes courts et fréquents sur AFDB, longs et soutenus sur LTAFDB) ;
+  \item la \textbf{fréquence d'échantillonnage} (250~Hz contre 128~Hz), qui modifie la résolution des intervalles \RR{}.
 \end{itemize}
+Le fait que ces différences n'entament pas la performance indique que le modèle a capturé une signature de la \FA{} largement invariante à ces conditions d'acquisition — un résultat encourageant pour un usage en conditions réelles.
 
-L'écart entre une cible métier ambitieuse (\(F_1 \geq 0{,}95\)) et le plafond observé (\(F_1 \approx 0{,}75\text{--}0{,}80\)) traduit la limite de l'information portée par les \RR{} seuls : sans la morphologie de l'\ECG{}, certains épisodes restent indissociables d'un rythme sinusal irrégulier.
+Deux réserves doivent cependant accompagner cette lecture. D'une part, LTAFDB est une base intrinsèquement plus favorable : sa charge de \FA{} moyenne atteint 58,1~\% contre 43,6~\% pour AFDB, et l'on a montré que la performance par patient dépend fortement de cette charge. D'autre part, la ligne de référence AFDB du tableau~\ref{tab:res:cross} ne repose que sur un pli et cinq patients. La conclusion défendable est donc que le modèle \emph{ne s'effondre pas} en changeant de conditions d'acquisition, et non qu'il s'y améliore.
+
+\section{Ce que le « plafond » recouvre réellement}
+\label{sec:disc:plafond}
+
+Il serait commode de résumer ce travail par la formule : « le signal \RR{} seul plafonne à un \(F_1\) par patient d'environ 0,88 ». Les analyses de la section~\ref{sec:res:incertitude} montrent que cette formule masque en réalité trois phénomènes de natures très différentes, qu'il importe de distinguer.
+
+\textbf{Une part relève de la calibration, non de la discrimination.} Le seuil de décision a été fixé à 0,5 dans tout ce mémoire, alors que les réseaux sont entraînés avec une perte pondérée qui décale leurs probabilités vers le haut. Leur seuil optimal se situe en réalité autour de 0,83--0,85. Régler ce seuil de façon honnête, sur les plis d'apprentissage seulement, fait passer le \CNN--\LSTM{} à 100\,k paramètres de 0,717 à 0,749. Le gain n'est cependant ni gratuit ni stable : la variante à 30\,k paramètres, soumise au même traitement, \emph{perd} au contraire cinq points. Avec 23~patients, régler un seuil sur les données revient largement à ajuster du bruit. Le fait que l'\AUROC{} atteigne 0,971 alors que le \(F_1\) par patient plafonne à 0,717 indique clairement que le modèle \emph{ordonne} correctement les fenêtres, et que la difficulté réside dans le placement de la frontière de décision.
+
+\textbf{Une part relève de la composition de la cohorte.} Le \(F_1\) est une métrique qui se dégrade mécaniquement quand la classe positive devient rare, puisque sa précision s'effondre dès les premières fausses alarmes. Or huit des vingt-trois patients notables d'AFDB ont une charge de \FA{} inférieure à 10~\%, dont quatre inférieure à 2~\%. En donnant à chacun le même poids, la moyenne par patient accorde une place considérable à ce régime difficile. Ce n'est pas un défaut de la métrique : c'est précisément ce qu'on lui demande de révéler, et c'est aussi le régime clinique le plus pertinent, la \FA{} paroxystique étant justement celle que le dépistage cherche à attraper.
+
+\textbf{Une part seulement relève véritablement de l'information disponible.} Une fois la calibration et la composition de la cohorte prises en compte, il subsiste un écart irréductible : même avec un seuil optimal choisi patient par patient — configuration irréalisable en pratique puisqu'elle suppose connue la vérité terrain —, le modèle profond ne dépasse pas 0,798 et le gradient boosting 0,925. Ce reliquat traduit la limite de l'information portée par les \RR{} seuls : privé de la morphologie de l'\ECG{}, et en particulier de l'onde P dont l'absence est le marqueur direct de la \FA{}, un détecteur ne peut pas distinguer certains épisodes d'une arythmie sinusale ou d'une salve d'extrasystoles.
+
+Cette décomposition a une conséquence pratique. Améliorer le \(F_1\) par patient d'un tel système ne passe pas prioritairement par une architecture plus profonde, mais par un travail de calibration par sujet, par une métrique adaptée aux classes très déséquilibrées, et — pour franchir réellement le plafond — par l'ajout d'une information morphologique.
 
 % --- 5.5 Limitations ------------------------------------------------
 \section{Limitations}
 \label{sec:disc:limites}
 
-Le présent travail comporte plusieurs limitations.
+Le présent travail comporte plusieurs limitations, qu'il convient d'énoncer clairement car elles bornent la portée des conclusions.
 
-\textbf{Données.} L'effectif d'AFDB est restreint (25~patients) et n'est pas représentatif de la diversité des conditions cliniques rencontrées en pratique.
+\textbf{Effectif.} L'effectif d'AFDB est restreint : 25~patients, dont 23~seulement contribuent au \(F_1\) par patient. C'est la limitation dominante, et elle se lit directement dans la largeur des intervalles de confiance de la figure~\ref{fig:res:ci}, qui couvrent quinze à vingt-cinq points. Toute conclusion fondée sur la comparaison de deux moyennes serait fragile ; c'est la raison pour laquelle les comparaisons de ce mémoire reposent sur une analyse appariée.
 
-\textbf{Annotations.} Les positions d'ondes R ont été extraites des annotations expertes ; un détecteur de R automatique introduirait un biais supplémentaire en conditions réelles.
+\textbf{Découpage non stratifié.} La validation croisée groupe bien les patients, mais elle équilibre le nombre de fenêtres par pli sans contrôler la prévalence de \FA{}. Un pli peut donc concentrer plusieurs patients à faible charge, ce qui contribue à l'écart-type inter-plis observé, particulièrement élevé pour les réseaux (jusqu'à 0,19). Une validation croisée groupée \emph{et} stratifiée réduirait cette source de variabilité.
+
+\textbf{Seuil de décision.} Toutes les métriques ont été calculées à un seuil fixe de 0,5, qui n'est optimal pour aucun des modèles profonds. Ce choix a été conservé par souci de comparabilité et parce que l'apprentissage d'un seuil sur 23~patients s'est révélé instable, mais il pénalise mécaniquement les modèles entraînés avec une perte pondérée.
+
+\textbf{Annotations.} Les positions d'ondes R proviennent des annotations expertes de PhysioNet. En conditions réelles, elles seraient produites par un détecteur automatique dont les erreurs — battements manqués ou détectés en double — créent artificiellement des intervalles \RR{} aberrants, c'est-à-dire exactement le motif d'irrégularité que le modèle apprend à associer à la \FA{}. La performance rapportée constitue donc une borne supérieure de ce qu'un système complet atteindrait.
+
+\textbf{Battements ectopiques.} Aucune correction des extrasystoles n'a été appliquée. Une extrasystole produit un intervalle court suivi d'une pause compensatrice, motif localement indiscernable d'une irrégularité fibrillatoire. Ce choix, assumé pour rester fidèle au signal qu'un capteur portable observerait, contribue vraisemblablement à la perte de spécificité constatée sur les patients à faible charge de \FA{}.
 
 \textbf{Information utilisée.} L'utilisation des seuls intervalles \RR{}, choisie pour sa simplicité de déploiement, exclut par construction la morphologie de l'onde P.
 
-\textbf{Évaluation.} L'évaluation s'est concentrée sur deux jeux de données ; un transfert vers des bases supplémentaires (CPSC2018, Icentia11k, etc.) reste à effectuer.
+\textbf{Mesures de latence.} Les latences ont été mesurées sur un processeur d'ordinateur portable, et non sur une cible embarquée. Elles permettent de classer les variantes entre elles, mais ne préjugent pas des performances sur microcontrôleur.
+
+\textbf{Évaluation externe.} L'évaluation s'est concentrée sur deux jeux de données issus du même dépôt et annotés selon des conventions voisines ; un transfert vers des bases construites différemment (CPSC2018, Icentia11k) reste à effectuer.
+
+\section{Conclusion}
+\label{sec:disc:conclusion}
+Ces limites, loin de remettre en cause les conclusions, en délimitent la portée et ouvrent directement sur les perspectives développées dans la conclusion générale.

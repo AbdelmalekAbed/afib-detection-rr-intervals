@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"home: %{http_code}\\\\n\" http://localhost:8501/)",
+      "Bash(curl -s http://localhost:8501/healthz)",
+      "Bash(curl -s http://localhost:8501/)",
+      "Bash(google-chrome --headless=new --disable-gpu --no-sandbox --hide-scrollbars --user-data-dir=/tmp/chrome-prof --window-size=1500,2300 --virtual-time-budget=25000 --force-device-scale-factor=1.25 --screenshot=/tmp/shot_home.png http://localhost:8501/)",
+      "Bash(.venv/bin/python -c 'import __TRACKED_VAR__; print\\('\\\\''OK __TRACKED_VAR__'\\\\''\\)')",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(pkill -f \"remote-debugging-port=9222\")",
+      "Bash(nohup google-chrome --headless=new --disable-gpu --no-sandbox --hide-scrollbars --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-cdp --window-size=1500,2000 about:blank)",
+      "Bash(curl -s http://localhost:9222/json/version)",
+      "Bash(curl -s http://localhost:9222/json)",
+      "Bash(pkill -9 -f \"user-data-dir=/tmp/chrome-cdp\")",
+      "Bash(google-chrome --headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage --hide-scrollbars --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 --user-data-dir=/tmp/chrome-cdp2 --window-size=1500,2000 about:blank)",
+      "Bash(.venv/bin/python scripts/_capture_streamlit.py)"
+    ]
+  }
+}

@@ -2,7 +2,7 @@
 
 > Phase 6 of the AFib CNN-LSTM project. An interactive playground that lets a
 > visitor *touch* every result of the thesis: pick a real patient, swap a 100k
-> FP32 model for a 90 KB INT8 one, push the model into a regime it has never
+> FP32 model for an 87 KB INT8 one, push the model into a regime it has never
 > seen, or draw an RR series by hand and watch the probability move in real
 > time.
 

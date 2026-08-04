@@ -2,58 +2,103 @@
 %  Annexes (Buttler) : éléments externes au rapport, lecture optionnelle.
 % =====================================================================
 
-\chapter{Liste des hyperparamètres optimisés}
+\chapter{Espaces de recherche et hyperparamètres retenus}
 \label{ann:hyperparams}
 
-Le tableau suivant détaille l'espace de recherche utilisé par Optuna en phase~3.
+Deux recherches Optuna distinctes ont été menées. Celle de la phase~3 a été
+conduite sur des fenêtres de 30~battements, avant que l'étude d'ablation ne
+révèle l'intérêt d'une fenêtre plus longue. Celle de la phase~3.5 a donc été
+relancée directement à \(W = 60\), avec des plages resserrées vers les petites
+architectures et une régularisation plus forte, afin de viser une empreinte
+mémoire réduite. Dans les deux cas, la fenêtre \(W\), la taille de \textit{batch}
+(512) et le pas de fenêtrage (30) ont été \emph{fixés}, et non recherchés.
 
 \begin{table}[H]
   \centering
-  \caption{Espace de recherche Optuna.}
+  \caption{Espaces de recherche Optuna. Les plages sont celles effectivement
+  déclarées dans les notebooks \texttt{03\_ablation.ipynb} (phase~3) et
+  \texttt{04\_phase35\_w60.ipynb} (phase~3.5). Le nombre de filtres de chaque
+  bloc convolutionnel est déduit du premier par doublement successif
+  (\(c,\ 2c,\ 4c\)), ce qui explique qu'un seul paramètre le contrôle.}
   \label{tab:ann:optuna}
-  \begin{tabular}{lll}
+  \begin{tabular}{llll}
     \toprule
-    \textbf{Hyperparamètre} & \textbf{Plage} & \textbf{Type} \\
+    \textbf{Hyperparamètre} & \textbf{Type} & \textbf{Phase 3} & \textbf{Phase 3.5} \\
     \midrule
-    Taille de fenêtre \(W\)        & [30, 60, 90, 120] & catégoriel \\
-    Filtres conv. couche 1         & [16, 32, 64]      & catégoriel \\
-    Filtres conv. couche 2         & [32, 64, 128]     & catégoriel \\
-    Unités LSTM                    & [32, 64, 128]     & catégoriel \\
-    Dropout                        & [0,1 ; 0,5]       & continu (log) \\
-    Taux d'apprentissage           & [1e-5 ; 1e-3]     & continu (log) \\
-    Taille de \textit{batch}       & [32, 64, 128]     & catégoriel \\
+    Nombre de blocs convolutionnels   & entier      & 2--3            & 2--3 \\
+    Filtres du premier bloc \(c\)     & catégoriel  & \{8, 16, 24\}   & \{8, 16\} \\
+    Taille de noyau                   & catégoriel  & \{3, 5, 7\}     & \{3, 5, 7\} \\
+    \textit{Dropout} convolutionnel   & continu     & [0,10 ; 0,40]   & [0,20 ; 0,50] \\
+    Unités \LSTM{} par direction      & catégoriel  & \{16, 32, 48\}  & \{16, 32, 48\} \\
+    Couches \LSTM{}                   & entier      & 1--2            & 1--2 \\
+    Unités de la couche dense         & catégoriel  & \{16, 32\}      & \{16, 32\} \\
+    \textit{Dropout} de la tête       & continu     & [0,10 ; 0,50]   & [0,30 ; 0,60] \\
+    Taux d'apprentissage              & continu (log) & [3e-4 ; 3e-3] & [3e-4 ; 2e-3] \\
+    Pénalisation \(L_2\)              & continu (log) & ---           & [1e-5 ; 3e-3] \\
+    \midrule
+    Nombre d'essais                   & ---         & 30              & 25 \\
+    Plis de la recherche              & ---         & 3               & 3 \\
+    Époques par essai                 & ---         & 8               & 15 \\
+    Fenêtre \(W\) (fixée)             & ---         & 30              & 60 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\chapter{Reproductibilité et code source}
-\label{ann:reproductibilite}
+Les configurations retenues à l'issue de ces deux recherches sont reportées à la
+table~\ref{tab:ann:best}. Elles sont archivées telles quelles dans le dépôt
+(\texttt{reports/phase3\_results.json} et
+\texttt{reports/phase35\_best\_params.json}) et rechargées par les scripts des
+phases~4 et~5, de sorte qu'aucune valeur n'est recopiée à la main.
 
-Le code complet du projet est disponible publiquement à l'adresse suivante :
-
-\medskip
-\centerline{\url{[À COMPLÉTER : URL du dépôt GitHub]}}
-\medskip
-
-Le fichier \texttt{requirements-lock.txt} fixe les versions exactes des bibliothèques utilisées. La commande \texttt{make demo} lance l'application interactive en local après installation des dépendances.
+\begin{table}[H]
+  \centering
+  \caption{Hyperparamètres retenus par la recherche bayésienne.}
+  \label{tab:ann:best}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Hyperparamètre} & \textbf{Phase 3 (100\,k)} & \textbf{Phase 3.5 (30\,k)} \\
+    \midrule
+    Blocs convolutionnels             & 3      & 3 \\
+    Filtres \((c,\ 2c,\ 4c)\)         & 24, 48, 96 & 16, 32, 64 \\
+    Taille de noyau                   & 7      & 5 \\
+    \textit{Dropout} convolutionnel   & 0,104  & 0,200 \\
+    Unités \LSTM{} par direction      & 48     & 16 \\
+    Couches \LSTM{}                   & 1      & 2 \\
+    Unités de la couche dense         & 32     & 16 \\
+    \textit{Dropout} de la tête       & 0,498  & 0,402 \\
+    Taux d'apprentissage              & 2{,}95e-3 & 1{,}65e-3 \\
+    Pénalisation \(L_2\)              & 0      & 1,59e-3 \\
+    \midrule
+    \textbf{Nombre de paramètres}     & \textbf{100\,193} & \textbf{30\,657} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \chapter{Captures d'écran complémentaires}
 \label{ann:screenshots}
 
+Cette annexe regroupe les captures des onglets de l'application \textit{Streamlit} non présentés au chapitre~\ref{ch:resultats}.
+
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.8\linewidth][5cm]{Capture — onglet Model Showdown}
-  \caption{Onglet \emph{Model Showdown} de l'application interactive.}
+  \includegraphics[width=\linewidth,height=0.7\textheight,keepaspectratio]{screens/model_showdown.png}
+  \caption{Onglet \emph{Model Showdown} : comparaison des variantes de compression sur un même patient AFDB (probabilités prédites et divergences vis-à-vis de la référence FP32).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.8\linewidth][5cm]{Capture — onglet Compression Lab}
-  \caption{Onglet \emph{Compression Lab}.}
+  \includegraphics[width=\linewidth,height=0.7\textheight,keepaspectratio]{screens/compression_lab.png}
+  \caption{Onglet \emph{Compression Lab} : front de Pareto taille\,/\,latence\,/\,$F_1$ et tableau complet des variantes.}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.8\linewidth][5cm]{Capture — onglet What-If}
-  \caption{Onglet \emph{What-If}.}
+  \includegraphics[width=\linewidth,height=0.7\textheight,keepaspectratio]{screens/cross_dataset.png}
+  \caption{Onglet \emph{Cross-Dataset} : comparaison des quatre configurations et distribution par patient sur LTAFDB.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth,height=0.7\textheight,keepaspectratio]{screens/what_if.png}
+  \caption{Onglet \emph{What-If} : inférence en direct sur une fenêtre \RR{} synthétique et verdict du modèle.}
 \end{figure}

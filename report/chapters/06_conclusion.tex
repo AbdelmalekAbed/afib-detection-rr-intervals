@@ -1,75 +1,23 @@
 % =====================================================================
-%  Chapitre 6 — Conclusion et perspectives
-%  Règles (Sayadi 5 / Buttler) :
-%   - récapituler brièvement le cheminement et les conclusions intermédiaires
-%   - énumérer les propositions
-%   - terminer par limitations + perspectives futures
+%  Conclusion générale — rédigée en paragraphes (sans sous-titres ni listes)
 % =====================================================================
-\chapter{Conclusion et perspectives}
+\chapter*{Conclusion générale}
+\addcontentsline{toc}{chapter}{Conclusion générale}
+\markboth{Conclusion générale}{Conclusion générale}
 \label{ch:conclusion}
 
-% --- 6.1 Récapitulatif ----------------------------------------------
-\section{Récapitulatif du travail réalisé}
-\label{sec:concl:recap}
+Ce mémoire a proposé une chaîne complète de détection de la fibrillation auriculaire fondée uniquement sur les intervalles \RR{}, conduite en six phases : l'établissement d'un protocole d'évaluation à l'échelle du patient et l'exploration de la base AFDB, la comparaison de cinq méthodes de référence, la conception d'un réseau hybride \CNN--\LSTM{} optimisé par recherche bayésienne, l'étude de sa compression, l'évaluation de sa robustesse par transfert vers un second jeu de données, puis la réalisation d'une application interactive. Ce fil conducteur a permis d'aborder la détection de la \FA{} non pas sous le seul angle de la performance de classification, mais selon trois exigences pratiques rarement traitées ensemble : l'honnêteté de l'évaluation, la compacité du modèle et sa capacité de généralisation.
 
-Ce mémoire a proposé une chaîne complète de détection de la fibrillation auriculaire à partir des seuls intervalles \RR{}, structurée en six phases.
+Le principal enseignement du travail tient à la sévérité d'une évaluation menée à l'échelle du patient. Sous ce protocole, les méthodes ne se valent pas : les classifieurs exploitant des descripteurs HRV — au premier rang desquels le gradient boosting, avec un \(F_1\) par patient de 0,883 — devancent les approches opérant directement sur la séquence \RR{} brute, qui atteignent au mieux 0,717. Une comparaison appariée, menée patient par patient, confirme que cet écart n'est pas un artefact d'échantillonnage : la différence moyenne s'établit à \(+0{,}167\) en faveur du gradient boosting, avec un intervalle de confiance à 95~\% qui exclut zéro, et l'avantage se vérifie sur vingt patients sur vingt-trois. Le réseau \CNN--\LSTM{} proposé se révèle néanmoins le meilleur de la seconde famille, dépassant ses composantes convolutionnelle et récurrente prises isolément.
 
-La \textbf{phase~1} a établi un protocole d'évaluation patient-level rigoureux et caractérisé la forte hétérogénéité inter-patients de la base AFDB.
+L'analyse de cet écart constitue sans doute l'apport le plus original du mémoire, car elle en localise précisément l'origine. Sur les patients dont plus de 10~\% de l'enregistrement est en fibrillation, les deux familles de méthodes sont proches. C'est sur les sujets à faible charge — ceux chez qui l'arythmie ne représente parfois que quelques dixièmes de pour cent du tracé — que le réseau décroche brutalement, avec un \(F_1\) de 0,457 contre 0,773 pour le gradient boosting. La difficulté du modèle profond n'est donc pas de reconnaître la fibrillation, mais de rester spécifique lorsque les épisodes sont rares : or c'est exactement le régime de la fibrillation paroxystique, celui que le dépistage cherche à attraper. Une seconde analyse montre par ailleurs qu'une part de l'écart relève de la calibration plutôt que du pouvoir discriminant, le seuil de décision optimal des réseaux se situant vers 0,84 et non 0,5, pour un \AUROC{} qui atteint pourtant 0,971.
 
-La \textbf{phase~2} a comparé quatre méthodes de référence (règle métier, forêt aléatoire, gradient boosting, \CNN{} 1D) sous ce même protocole.
+L'intérêt du modèle profond se situe dès lors moins dans le \(F_1\) brut que dans son profil de déploiement : un traitement de bout en bout sans extraction manuelle de descripteurs, et surtout une compression remarquable, la quantification INT8 ramenant le modèle à 87~KB sans aucune perte de performance — là où l'élagage, quel que soit son taux, s'est révélé sans bénéfice. Enfin, le transfert d'AFDB vers LTAFDB préserve l'essentiel du \(F_1\) par patient sans le moindre réentraînement, tandis que l'application interactive développée rend les décisions du modèle explorables patient par patient, au service de la transparence auprès d'un public clinicien.
 
-La \textbf{phase~3} a conçu une architecture \CNN--\LSTM{} optimisée par recherche bayésienne, accompagnée d'une étude d'ablation.
+Ces résultats doivent toutefois être lus à la lumière de plusieurs limites. L'effectif de la base AFDB demeure restreint — vingt-trois patients notables —, ce qui se traduit par des intervalles de confiance larges et impose de raisonner sur des comparaisons appariées plutôt que sur des moyennes isolées. Le découpage en plis groupe bien les patients mais n'équilibre pas la prévalence de la fibrillation, ce qui accroît la variabilité entre plis. Le seuil de décision a été maintenu à 0,5 alors qu'il n'est optimal pour aucun modèle profond. Les positions des ondes R reposent sur des annotations expertes, là où un détecteur automatique introduirait en conditions réelles des intervalles aberrants imitant précisément la signature recherchée ; aucune correction des battements ectopiques n'a par ailleurs été appliquée. Le choix des seuls intervalles \RR{}, motivé par la simplicité de déploiement, exclut par construction la morphologie de l'onde P. Les latences, enfin, ont été mesurées sur un processeur d'ordinateur portable et non sur une cible embarquée.
 
-La \textbf{phase~4} a évalué huit variantes de compression et identifié la combinaison optimale (quantification statique INT8) qui atteint 87~KB d'empreinte mémoire sans dégradation significative.
+Ces limites tracent naturellement les perspectives, et l'analyse du plafond indique dans quel ordre les aborder. La piste la plus immédiatement rentable n'est pas architecturale mais statistique : puisque l'essentiel de la perte se concentre sur les patients à faible charge de fibrillation, un travail de calibration — seuil adapté au sujet, lissage temporel des décisions pour supprimer les fausses alarmes isolées, ou métrique mieux adaptée aux classes très déséquilibrées — devrait produire un gain supérieur à celui d'un modèle plus profond, et à coût quasi nul. Viennent ensuite une validation croisée groupée \emph{et} stratifiée sur la prévalence, ainsi qu'une évaluation sur des bases supplémentaires telles que CPSC2018 ou Icentia11k, afin de resserrer des intervalles de confiance aujourd'hui bornés par vingt-trois sujets.
 
-La \textbf{phase~5} a quantifié la perte cross-dataset par transfert AFDB~$\rightarrow$~LTAFDB.
+À moyen terme, l'ajout d'une seconde branche d'entrée portant la morphologie de l'\ECG{} — onde P, complexe QRS — permettrait de tester directement l'hypothèse du plafond informationnel, en mesurant ce qui reste gagnable une fois la calibration traitée. À plus long terme, l'industrialisation du pipeline sur un microcontrôleur ARM Cortex-M et l'étude d'approches d'adaptation de domaine ouvriraient la voie à un usage clinique réel.
 
-La \textbf{phase~6} a livré un tableau de bord interactif \textit{Streamlit} pour l'exploration patient par patient des décisions du modèle.
-
-% --- 6.2 Apports principaux -----------------------------------------
-\section{Apports principaux}
-\label{sec:concl:apports}
-
-Les apports de ce travail sont les suivants :
-\begin{itemize}[leftmargin=*]
-  \item la mise en évidence d'un \keyword{plateau intrinsèque} de \(F_1 \approx 0{,}75\text{--}0{,}80\) pour la classification patient à partir des seuls \RR{}, indépendant de la famille de classifieur ;
-  \item une étude de compression aboutie permettant un déploiement embarqué (modèle de 87~KB) ;
-  \item une mesure honnête de la robustesse cross-dataset, peu documentée jusqu'ici ;
-  \item un outil d'exploration interactive favorisant la transparence et la pédagogie auprès d'un public clinicien.
-\end{itemize}
-
-% --- 6.3 Limitations ------------------------------------------------
-\section{Limitations}
-\label{sec:concl:limites}
-
-Les principales limitations du travail, déjà discutées au chapitre~\ref{ch:discussion}, sont rappelées ici :
-\begin{itemize}
-  \item un effectif patient restreint sur AFDB ;
-  \item une dépendance aux annotations expertes pour les positions de R ;
-  \item l'utilisation exclusive du signal \RR{}, qui ignore la morphologie ;
-  \item un nombre limité de jeux de données externes pour l'évaluation de la robustesse.
-\end{itemize}
-
-% --- 6.4 Perspectives -----------------------------------------------
-\section{Perspectives}
-\label{sec:concl:perspectives}
-
-Plusieurs extensions de ce travail sont envisagées.
-
-\textbf{Court terme.}
-\begin{itemize}
-  \item Réaliser un déploiement de l'application sur Streamlit Community Cloud pour rendre la démonstration accessible publiquement.
-  \item Compléter les ré-exports des figures en \texttt{.pdf} 300 dpi pour la qualité d'impression du présent mémoire.
-\end{itemize}
-
-\textbf{Moyen terme.}
-\begin{itemize}
-  \item Ajouter une seconde branche d'entrée portant la morphologie de l'\ECG{} (onde P, complexe QRS), afin de tester l'hypothèse du plateau intrinsèque.
-  \item Évaluer le modèle final sur d'autres jeux de données publics (CPSC2018, Icentia11k) pour étendre la mesure de robustesse.
-\end{itemize}
-
-\textbf{Long terme.}
-\begin{itemize}
-  \item Industrialiser le pipeline avec un test prospectif sur un dispositif embarqué (microcontrôleur ARM Cortex-M, par exemple).
-  \item Étudier une approche d'\emph{adaptation de domaine} (fine-tuning court par patient ou par dataset cible) pour combler l'écart cross-dataset.
-\end{itemize}
+Au-delà de la fibrillation auriculaire, la démarche défendue ici — une évaluation à l'échelle du patient, une incertitude explicitement quantifiée, un modèle compact et une robustesse mesurée plutôt que supposée — constitue un cadre transposable à d'autres problèmes de détection sur signaux physiologiques. Ce mémoire aura montré, s'il fallait le rappeler, qu'un résultat modeste mais correctement mesuré vaut mieux qu'un résultat brillant obtenu par un protocole complaisant.

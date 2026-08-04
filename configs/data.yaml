@@ -1,12 +1,19 @@
+# Configuration de référence du pipeline de données.
+# Les valeurs ci-dessous sont celles effectivement utilisées par toutes les
+# expériences rapportées (phases 2 à 5) : fenêtre de 60 battements, pas de 30.
 datasets:
   afdb:
     physionet_id: afdb
     enabled: true
     role: train_val
   nsrdb:
+    # Téléchargée à titre exploratoire (phase 1) mais NON utilisée par les
+    # expériences rapportées : AFDB contient déjà 56 % de fenêtres non-FA, et
+    # ajouter des sujets 100 % sains fausserait le F1 par patient (un patient
+    # sans aucun épisode de FA n'est pas notable, cf. src/utils/metrics.py).
     physionet_id: nsrdb
-    enabled: true
-    role: negatives
+    enabled: false
+    role: unused
   ltafdb:
     physionet_id: ltafdb
     enabled: true
@@ -21,19 +28,31 @@ paths:
   processed_dir: data/processed
 
 windowing:
-  window_size: 30
-  stride: 15
-  label_strategy: majority
+  # 60 battements ≈ 45 s de signal à 80 bpm. L'ablation de la phase 3 a montré
+  # que passer de 30 à 60 battements est le facteur le plus déterminant.
+  window_size: 60
+  stride: 30
+  label_strategy: majority   # fenêtre positive si ≥ 50 % de ses battements sont en FA
 
 preprocessing:
-  remove_ectopic: true
-  ectopic_threshold: 0.20
+  # Seul filtrage appliqué : élimination des RR physiologiquement impossibles.
+  # Aucune correction de battement ectopique n'est réalisée — c'est un choix
+  # assumé, discuté au chapitre 5 du mémoire (limitations).
   normalize: zscore_per_window
   clip_rr_seconds:
     min: 0.3
     max: 2.0
 
 split:
-  scheme: patient_kfold
+  # GroupKFold (scikit-learn) : découpage déterministe par patient, SANS
+  # mélange aléatoire et SANS stratification sur la prévalence de FA.
+  # La graine ci-dessous ne pilote donc pas le découpage, seulement
+  # l'initialisation des modèles (cf. src/utils/seed.py).
+  scheme: patient_groupkfold
   n_folds: 5
   seed: 42
+
+evaluation:
+  # Seuil de décision utilisé pour toutes les métriques rapportées.
+  # Sa sensibilité est étudiée explicitement par scripts/phase6_analysis.py.
+  decision_threshold: 0.5

@@ -44,8 +44,10 @@ optuna.db
 *.sqlite
 *.sqlite3
 
-# Reports build
+# Reports build (notebook artifacts)
 reports/build/
+
+# LaTeX intermediates (across the repo)
 *.aux
 *.log
 *.out
@@ -53,6 +55,16 @@ reports/build/
 *.bbl
 *.blg
 *.synctex.gz
+*.bcf
+*.run.xml
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+
+# LaTeX memoir build dir + final PDF (regenerated on demand by `make report-pdf`)
+report/build/
+report/main.pdf
 
 # IDE
 .idea/
@@ -82,3 +94,6 @@ mlflow/
 # Local-only reference material (not for the public repo)
 instructions report/
 prototypes mémoire/
+
+# Reglages locaux de session Claude Code
+.claude/settings.local.json

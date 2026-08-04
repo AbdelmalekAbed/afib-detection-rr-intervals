@@ -1,7 +1,6 @@
 """Cross-Dataset — Phase 5 results with patient-level drill-down."""
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -12,7 +11,6 @@ from utils import (
     get_demo_patients_ltafdb,
     header,
     kpi_row,
-    load_oof_npz,
     load_results_json,
 )
 

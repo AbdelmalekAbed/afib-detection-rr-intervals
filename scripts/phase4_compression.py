@@ -19,7 +19,6 @@ Variantes mesurées :
 from __future__ import annotations
 
 import argparse
-import copy
 import io
 import json
 import sys
@@ -35,13 +34,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.baselines.cv import zscore_per_window
-from torch.utils.data import DataLoader, TensorDataset
 from torch import nn as _nn
-from sklearn.metrics import roc_auc_score
-from src.data.loader import list_records, load_record_metadata
-from src.data.rr_extract import clean_rr_series, extract_rr_series
-from src.data.windowing import build_windowed_dataset
+from torch.utils.data import DataLoader, TensorDataset
+
+from src.baselines.cv import zscore_per_window
+from src.data.build import build_windows
 from src.models.cnn_lstm import CNNLSTM
 from src.utils.metrics import per_patient_f1, ranking_metrics, threshold_metrics
 from src.utils.seed import set_seed
@@ -110,18 +107,7 @@ def train_one_fold_keep_best(
 # Data
 # --------------------------------------------------------------------------- #
 def build_afdb_windows(window: int, stride: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    dataset_dir = PROJECT_ROOT / "data" / "raw" / "afdb"
-    series_by_patient = {}
-    for rec in list_records(dataset_dir):
-        try:
-            meta = load_record_metadata(dataset_dir, rec)
-            s = clean_rr_series(extract_rr_series(meta))
-            if len(s.rr_seconds) >= window:
-                series_by_patient[rec] = s
-        except Exception:
-            continue
-    w = build_windowed_dataset(series_by_patient, window_size=window, stride=stride, label_strategy="majority")
-    return w.X.astype(np.float32), w.y.astype(np.int8), np.asarray(w.patient_id)
+    return build_windows(PROJECT_ROOT / "data" / "raw" / "afdb", window=window, stride=stride)
 
 
 # --------------------------------------------------------------------------- #
@@ -316,7 +302,7 @@ def main() -> None:
 
     # 2. Load best params (from --params-json; supports either {"best_params": {...}} or {...})
     raw_params = json.loads(args.params_json.read_text())
-    best = raw_params["best_params"] if "best_params" in raw_params else raw_params
+    best = raw_params.get("best_params", raw_params)
     print(f"[params] loaded from {args.params_json} (input_length={WINDOW}): {best}")
     n_params = sum(p.numel() for p in make_model(best, WINDOW).parameters())
     print(f"[params] model parameter count: {n_params:,}")
@@ -452,7 +438,7 @@ def main() -> None:
     onnx_sizes, onnx_lat_p50, onnx_lat_p95, onnx_lat_mean = [], [], [], []
     onnx_max_abs = []
     onnx_t0 = time.time()
-    for k, (tr, va) in enumerate(patient_kfold(groups, y, n_splits=args.n_splits)):
+    for k, (_tr, va) in enumerate(patient_kfold(groups, y, n_splits=args.n_splits)):
         m = make_model(best, WINDOW)
         m.load_state_dict(fold_states[k])
         m.eval()
@@ -595,7 +581,7 @@ def main() -> None:
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    bars = ax.bar(df_plot["variant"], df_plot["latency_ms_p50"],
+    ax.bar(df_plot["variant"], df_plot["latency_ms_p50"],
                   yerr=(df_plot["latency_ms_p95"] - df_plot["latency_ms_p50"]),
                   color="#9467bd", capsize=4)
     ax.axhline(50, color="#d62728", ls="--", lw=1, label="cible 50 ms")

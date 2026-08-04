@@ -8,12 +8,25 @@
 \chapter{État de l'art}
 \label{ch:soa}
 
-% --- 2.1 Rappels cliniques -------------------------------------------
-\section{Rappels cliniques sur la fibrillation auriculaire}
+\section{Introduction}
+\label{sec:soa:intro}
+Ce chapitre pose les fondations du travail. Il présente d'abord les éléments cliniques de la fibrillation auriculaire et sa signature sur l'\ECG{}, puis introduit le signal \RR{} comme entrée monodimensionnelle. Il décrit ensuite les deux jeux de données publics utilisés, passe en revue les principales familles d'approches algorithmiques de la littérature, et se termine par une synthèse positionnant le présent mémoire par rapport à l'existant.
+
+% --- 2.1 Contexte clinique -------------------------------------------
+\section{Contexte clinique de la fibrillation auriculaire}
 \label{sec:soa:clinique}
 
 \subsection{Définition et impact}
-La \FA{} se caractérise par une activité électrique désorganisée des oreillettes, entraînant un rythme ventriculaire irrégulier. Sa prévalence augmente avec l'âge et atteint près de 10~\% au-delà de 80~ans \cite{hindricks2021guidelines}.
+La \FA{} se caractérise par une activité électrique désorganisée des oreillettes : au lieu d'une contraction coordonnée déclenchée par le n{\oe}ud sinusal, de multiples fronts de dépolarisation parcourent le tissu auriculaire de façon anarchique. Le n{\oe}ud auriculo-ventriculaire ne transmet qu'une partie de ces impulsions, et de manière imprévisible, ce qui produit le rythme ventriculaire irrégulier caractéristique de l'arythmie.
+
+Sa prévalence augmente fortement avec l'âge : de l'ordre de 0,5~\% avant 50~ans, elle approche 10~\% au-delà de 80~ans \cite{hindricks2021guidelines}. À l'échelle mondiale, le nombre de personnes atteintes a été estimé à plus de 33~millions, en croissance continue avec le vieillissement des populations \cite{chugh2014worldwide}.
+
+L'enjeu principal n'est pas l'arythmie elle-même, souvent bien tolérée, mais sa complication majeure. La stase sanguine dans une oreillette qui ne se contracte plus efficacement favorise la formation de caillots ; migrant vers la circulation cérébrale, ceux-ci provoquent un accident vasculaire cérébral ischémique. L'étude de Framingham a établi que la \FA{} multiplie ce risque par un facteur de l'ordre de cinq, indépendamment des autres facteurs de risque cardiovasculaire \cite{wolf1991atrial}. Or ce risque est largement évitable par un traitement anticoagulant — à condition que l'arythmie soit détectée.
+
+\subsection{Le problème du dépistage}
+C'est précisément là que réside la difficulté. Une large part des \FA{} est \keyword{paroxystique} : les épisodes surviennent par intermittence, durent de quelques minutes à quelques heures, et cessent spontanément. Ils sont fréquemment asymptomatiques. Un électrocardiogramme de quelques secondes réalisé en consultation a donc toutes les chances de tomber en dehors d'un épisode, et de conclure à tort à un rythme normal.
+
+Cette observation motive le recours à l'enregistrement ambulatoire prolongé — Holter de 24 à 48~heures, patchs adhésifs de plusieurs semaines, montres connectées — et, par voie de conséquence, à l'analyse automatique : un enregistrement de 24~heures contient environ cent mille battements, dont la lecture manuelle est irréalisable à l'échelle d'une population. L'intérêt de ce dépistage à grande échelle a été démontré cliniquement, notamment par une étude portant sur plus de \num{400000} porteurs de montre connectée \cite{perez2019large}.
 
 \subsection{Signature électrocardiographique}
 Sur l'\ECG{}, la \FA{} se traduit par trois signes principaux :
@@ -25,7 +38,37 @@ Sur l'\ECG{}, la \FA{} se traduit par trois signes principaux :
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][6cm]{ECG en rythme sinusal vs ECG en FA — illustration des trois signes}
+  \begin{tikzpicture}[xscale=1.05, yscale=0.9, line width=0.7pt]
+    % ---------- Tracé en rythme sinusal (régulier, avec onde P) ----------
+    \node[anchor=east, font=\small\bfseries] at (-0.2,0.4) {Sinusal};
+    \foreach \x in {0,2.5,5,7.5}{
+      \draw (\x,0)--(\x+0.35,0)
+        .. controls (\x+0.5,0.22) and (\x+0.7,0.22) .. (\x+0.85,0)  % onde P
+        --(\x+1.05,0)--(\x+1.15,-0.12)--(\x+1.25,1.05)--(\x+1.35,-0.28)--(\x+1.45,0) % QRS
+        .. controls (\x+1.8,0.32) and (\x+2.1,0.32) .. (\x+2.35,0)  % onde T
+        --(\x+2.5,0);
+    }
+    % annotations sinusal
+    \draw[<->,gray] (1.25,1.25)--(3.75,1.25) node[midway,above,font=\scriptsize]{RR régulier};
+    \draw[<->,gray] (3.75,1.25)--(6.25,1.25);
+    \node[font=\scriptsize] at (0.6,0.55) {P};
+
+    % ---------- Tracé en fibrillation (irrégulier, sans onde P) ----------
+    \begin{scope}[yshift=-2.6cm]
+      \node[anchor=east, font=\small\bfseries] at (-0.2,0.4) {FA};
+      % ligne de base fibrillatoire (petites ondulations)
+      \draw[gray!70] (0,0)
+        \foreach \i in {1,...,40}{ -- (\i*0.25, {0.06*sin(\i*120)}) };
+      % complexes QRS à intervalles irréguliers, sans onde P
+      \foreach \x in {0.8,2.4,3.3,5.1,6.0,7.8,9.0}{
+        \draw (\x,0)--(\x+0.1,-0.12)--(\x+0.2,1.0)--(\x+0.3,-0.28)--(\x+0.4,0);
+      }
+      \draw[<->,gray] (0.9,1.25)--(2.5,1.25) node[midway,above,font=\scriptsize]{RR};
+      \draw[<->,gray] (2.5,1.25)--(3.4,1.25) node[midway,above,font=\scriptsize]{RR};
+      \draw[<->,gray] (3.4,1.25)--(5.2,1.25) node[midway,above,font=\scriptsize]{irrégulier};
+      \node[font=\scriptsize, align=center] at (1.3,-0.55) {absence\\d'onde P};
+    \end{scope}
+  \end{tikzpicture}
   \caption{Exemples d'\ECG{} en rythme sinusal (haut) et en fibrillation auriculaire (bas). L'absence d'onde P et l'irrégularité des intervalles \RR{} sont caractéristiques de la \FA{}.}
   \label{fig:soa:ecg_fa}
 \end{figure}
@@ -37,14 +80,37 @@ Sur l'\ECG{}, la \FA{} se traduit par trois signes principaux :
 \subsection{Définition}
 L'intervalle \RR{} désigne la durée séparant deux ondes R consécutives, c'est-à-dire deux contractions ventriculaires. La suite des intervalles \RR{} forme un \keyword{tachogramme} qui résume l'information de rythme indépendamment de la morphologie de l'\ECG{}.
 
+\subsection{Descripteurs classiques de variabilité}
+L'analyse de la variabilité du rythme cardiaque dispose d'un cadre normalisé de longue date \cite{taskforce1996hrv}, dont sont issus les descripteurs utilisés comme méthodes de référence dans ce mémoire. Les principaux sont rappelés à la table~\ref{tab:soa:hrv}.
+
+\begin{table}[H]
+  \centering
+  \caption{Descripteurs de variabilité du rythme cardiaque utilisés dans ce travail.}
+  \label{tab:soa:hrv}
+  \begin{tabular}{llp{6.2cm}}
+    \toprule
+    \textbf{Descripteur} & \textbf{Définition} & \textbf{Intérêt pour la \FA{}} \\
+    \midrule
+    SDNN   & écart-type des \RR{} & variabilité globale, sensible aussi aux dérives lentes \\
+    RMSSD  & racine de la moyenne des carrés des différences successives & variabilité \emph{battement à battement}, très élevée en \FA{} \\
+    pNN50  & proportion de différences successives dépassant \SI{50}{\milli\second} & mesure directe de l'irrégularité à court terme \\
+    Entropie de Shannon & entropie de l'histogramme des \RR{} & désordre de la distribution des durées \\
+    Coefficient de variation & écart-type rapporté à la moyenne & variabilité normalisée par la fréquence cardiaque \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Le RMSSD et le coefficient de variation occupent une place particulière : ils mesurent l'irrégularité \emph{locale}, celle qui distingue la \FA{} d'une simple accélération du rythme. C'est sur ce dernier que repose la méthode de référence la plus simple évaluée dans ce mémoire.
+
 \subsection{Avantages et limites}
 L'analyse fondée sur les \RR{} présente plusieurs avantages :
 \begin{itemize}
-  \item robustesse au bruit basse fréquence et aux variations d'amplitude ;
-  \item faible coût computationnel ;
-  \item compatibilité avec les capteurs portables.
+  \item \textbf{robustesse} : la détection de l'onde R, pic le plus ample de l'\ECG{}, reste fiable là où l'onde P — d'amplitude dix à vingt fois plus faible — disparaît dans le bruit dès que l'électrode bouge ou que la peau sèche ;
+  \item \textbf{compacité} : une heure d'\ECG{} à \SI{250}{\hertz} représente \num{900000} échantillons, contre environ \num{4000} intervalles \RR{} — un facteur de compression supérieur à deux cents, décisif pour un appareil sur batterie ;
+  \item \textbf{disponibilité} : les capteurs photopléthysmographiques des montres connectées, qui ne produisent aucun \ECG{}, fournissent néanmoins des intervalles entre battements.
 \end{itemize}
-Elle souffre toutefois d'une limite intrinsèque : elle ignore la morphologie de l'onde P, dont l'absence est pourtant un marqueur direct de la \FA{}.
+
+Elle souffre en contrepartie d'une limite intrinsèque, sur laquelle ce mémoire reviendra longuement : elle ignore la morphologie de l'onde P, dont l'absence est pourtant le marqueur \emph{direct} de la \FA{}. Un détecteur fondé sur les seuls \RR{} observe une conséquence de l'arythmie — l'irrégularité — et non sa cause. Il reste donc exposé à toute autre source d'irrégularité : extrasystoles fréquentes, arythmie sinusale respiratoire marquée, ou blocs auriculo-ventriculaires de conduction variable.
 
 % --- 2.3 Jeux de données ---------------------------------------------
 \section{Jeux de données publics}
@@ -77,26 +143,44 @@ La base LTAFDB \cite{petrutiu2007abrupt} contient 84~enregistrements de 24 à 25
 \section{Approches algorithmiques pour la détection de la \FA{}}
 \label{sec:soa:approches}
 
-\subsection{Méthodes statistiques}
-Les premières approches ont exploité des descripteurs statistiques de la série \RR{} : coefficient de variation, racine de la moyenne des carrés des différences successives (RMSSD), entropie de Shannon, entropie multi-échelle \cite{tateno2001automatic,lake2011accurate}.
+Les travaux publiés se répartissent en quatre familles, qu'on peut ordonner selon la quantité de connaissance experte qu'elles incorporent — décroissante — et la quantité de données qu'elles réclament — croissante.
+
+\subsection{Méthodes statistiques à seuil}
+La première famille calcule un descripteur de variabilité sur une fenêtre glissante et le compare à un seuil. Le travail fondateur de Moody et Mark \cite{moody1983new}, à l'origine même de la base AFDB, modélise les transitions entre intervalles \RR{} par une chaîne de Markov. Tateno et Glass \cite{tateno2001automatic} comparent l'histogramme des différences successives à un histogramme de référence, et rapportent une sensibilité voisine de 94~\% pour une spécificité de 97~\% sur AFDB. Lake et Moorman \cite{lake2011accurate} montrent qu'une entropie d'échantillon correctement estimée reste discriminante sur des séquences très courtes, contrainte majeure pour les dispositifs implantables — problème également traité par Sarkar \textit{et al.} \cite{sarkar2008detector} au moyen d'une représentation bidimensionnelle des \RR{} successifs. Dash \textit{et al.} \cite{dash2009automatic} combinent une mesure de variabilité et une mesure d'irrégularité pour un fonctionnement en temps réel, tandis que Huang \textit{et al.} \cite{huang2011novel} s'attachent spécifiquement à localiser les \emph{transitions} entre rythme sinusal et \FA{}.
+
+L'intérêt de cette famille est sa transparence : le seuil est interprétable et le coût de calcul négligeable. Sa limite est sa rigidité, un seuil unique s'accommodant mal de la variabilité inter-patients.
 
 \subsection{Apprentissage automatique classique}
-Avec l'essor de l'apprentissage automatique, ces descripteurs ont alimenté des classifieurs supervisés tels que les forêts aléatoires et le gradient boosting \cite{XX_baseline_gb}.
+La deuxième famille conserve les descripteurs experts mais remplace le seuil par un classifieur appris. Les forêts aléatoires \cite{breiman2001random} et les méthodes de gradient boosting \cite{chen2016xgboost,ke2017lightgbm} y dominent, car elles capturent des interactions non linéaires entre descripteurs tout en restant robustes sur de faibles effectifs. C'est cette famille qui fournit la méthode de référence la plus exigeante du présent mémoire.
 
 \subsection{Apprentissage profond sur \ECG{} brut}
-Les architectures profondes appliquées directement au signal \ECG{} ont récemment atteint une performance comparable à celle d'un cardiologue \cite{hannun2019cardiologist}.
+La troisième famille abandonne les descripteurs et apprend directement depuis le signal. Rajpurkar \textit{et al.} puis Hannun \textit{et al.} \cite{hannun2019cardiologist} entraînent un réseau convolutionnel profond de type résiduel sur plus de \num{90000} patients et atteignent une performance comparable à celle d'un panel de cardiologues sur douze classes d'arythmies. Ribeiro \textit{et al.} \cite{ribeiro2020automatic} obtiennent un résultat analogue sur \ECG{} à douze dérivations.
+
+Ces travaux constituent l'état de l'art absolu en performance, mais reposent sur deux conditions que le contexte embarqué ne remplit pas : un signal \ECG{} complet et propre, et des cohortes de plusieurs dizaines de milliers de patients. Ils fournissent en revanche une référence méthodologique précieuse, ayant systématiquement adopté un découpage à l'échelle du patient.
 
 \subsection{Apprentissage profond sur intervalles \RR{}}
-Plus pertinents pour ce mémoire, les travaux ciblant le seul signal \RR{} reposent généralement sur des architectures hybrides combinant convolutions 1D et couches récurrentes \cite{andersen2019deep}.
+La quatrième famille, la plus proche de ce mémoire, applique l'apprentissage profond au seul tachogramme. Faust \textit{et al.} \cite{faust2018automated} emploient un réseau récurrent \LSTM{} bidirectionnel sur des fenêtres de 100~intervalles \RR{} d'AFDB et rapportent une exactitude supérieure à 98~\%. Andersen \textit{et al.} \cite{andersen2019deep} proposent une architecture hybride combinant convolutions unidimensionnelles et couches récurrentes — la structure retenue dans le présent travail — et annoncent une sensibilité et une spécificité supérieures à 98~\%.
 
-% --- 2.5 Synthèse & positionnement -----------------------------------
-\section{Synthèse et positionnement}
+Ces performances, bien supérieures à celles obtenues ici, appellent une lecture attentive du protocole d'évaluation. Le chapitre~\ref{ch:discussion} montrera qu'elles correspondent à une mesure \emph{par fenêtre} et que, reproduite sur nos propres données, cette manière de compter donne effectivement des chiffres du même ordre.
+
+\subsection{La question du protocole d'évaluation}
+\label{sec:soa:protocole}
+Un dernier corpus, transverse aux familles précédentes, porte non sur les modèles mais sur la façon de les évaluer. Saeb \textit{et al.} \cite{saeb2017need} montrent que, lorsque plusieurs enregistrements proviennent d'un même sujet, un découpage aléatoire des enregistrements — plutôt que des sujets — produit des estimations de performance systématiquement optimistes, l'écart pouvant atteindre plusieurs dizaines de points. La raison est que le modèle apprend à reconnaître le sujet, information disponible à l'apprentissage comme au test, plutôt que la pathologie.
+
+Cette question est centrale pour la détection de la \FA{} : les bases publiques comptent quelques dizaines de patients pour des dizaines de milliers de fenêtres, et chaque tachogramme porte une signature individuelle marquée. Le protocole retenu dans ce mémoire découle directement de ce constat.
+
+% --- 2.5 Conclusion (synthèse & positionnement) ----------------------
+\section{Conclusion}
 \label{sec:soa:positionnement}
 
-La littérature révèle trois éléments insuffisamment traités :
+La revue qui précède fait apparaître un paysage contrasté. Les méthodes statistiques sont interprétables mais rigides ; l'apprentissage automatique classique sur descripteurs HRV offre un excellent compromis sur de faibles effectifs ; l'apprentissage profond sur \ECG{} brut domine en performance mais exige un signal complet et de très grandes cohortes ; l'apprentissage profond sur \RR{} occupe une position intermédiaire, adaptée au déploiement embarqué.
+
+Trois éléments y demeurent insuffisamment traités.
+
 \begin{enumerate}[leftmargin=*]
-  \item l'\textbf{évaluation à l'échelle du patient}, souvent remplacée par une évaluation par fenêtre, qui surestime la performance ;
-  \item l'\textbf{empreinte mémoire} du modèle final, rarement rapportée ;
-  \item la \textbf{généralisation cross-dataset}, peu étudiée.
+  \item L'\textbf{évaluation à l'échelle du patient} est souvent remplacée par une évaluation par fenêtre, laquelle surestime la performance et masque la dispersion entre sujets. Lorsque le découpage lui-même ignore l'identité du patient, s'y ajoute une fuite d'information caractérisée \cite{saeb2017need}.
+  \item L'\textbf{empreinte mémoire et la latence} du modèle final sont rarement rapportées, alors même que le déploiement embarqué est presque systématiquement invoqué comme motivation.
+  \item La \textbf{généralisation cross-dataset} est peu étudiée : la grande majorité des résultats publiés sur les \RR{} concernent la seule base AFDB, dont les 25~patients ne sauraient représenter la diversité clinique réelle.
 \end{enumerate}
-Le présent travail se positionne précisément sur ces trois axes.
+
+Le présent travail se positionne précisément sur ces trois axes : il évalue systématiquement à l'échelle du patient sous un découpage groupé, il mesure et rapporte taille et latence pour chaque variante compressée, et il quantifie explicitement la perte de performance lors d'un transfert vers une seconde base. Il ajoute enfin un quatrième axe, absent de la littérature consultée : la quantification de l'\textbf{incertitude} des comparaisons, indispensable dès lors que les conclusions reposent sur quelques dizaines de patients.

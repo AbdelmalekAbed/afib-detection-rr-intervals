@@ -1,24 +1,40 @@
 # Mémoire LaTeX — Détection de la FA par CNN-LSTM
 
-Squelette du mémoire de Master, conforme aux **directives Sayadi** (12 pt Times-like, interligne 1,5, marges 25 mm, IMRAD, biblio numérotée style IEEE).
+Source LaTeX du mémoire de Master, conforme aux **directives Sayadi** (12 pt Times-like, interligne 1,5, marges 25 mm, plan IMRAD, bibliographie numérotée style IEEE).
 
 ## Compilation
 
-### Sur Overleaf
+### En local (recommandé)
+
+Une fois TeX Live installé (voir ci-dessous), depuis la racine du dépôt :
+
+```bash
+make report-pdf      # produit report/main.pdf
+make report-watch    # recompile à chaque sauvegarde (live preview)
+make report-clean    # nettoie report/build/ et le PDF
+```
+
+Le PDF final atterrit à **`report/main.pdf`** (non versionné — regénéré sur demande).
+Les fichiers intermédiaires (.aux, .bbl, .log, etc.) sont confinés dans `report/build/`.
+
+**Installation TeX Live (Ubuntu/Debian, une fois pour toutes) :**
+
+```bash
+sudo apt update && sudo apt install -y \
+  texlive-latex-recommended texlive-latex-extra \
+  texlive-fonts-recommended texlive-fonts-extra \
+  texlive-lang-french texlive-bibtex-extra \
+  texlive-science texlive-pictures \
+  biber latexmk
+```
+
+### Sur Overleaf (alternative)
+
 1. Compresser le dossier `report/` en `.zip`.
 2. Importer le `.zip` dans un nouveau projet Overleaf.
 3. Régler le compilateur sur **pdfLaTeX** (Menu → Settings → Compiler).
-4. Régler le moteur biblio sur **Biber** (Menu → Settings → TeX Live version récente).
+4. Régler le moteur biblio sur **Biber**.
 5. Cliquer sur **Recompile**.
-
-### En local
-```bash
-cd report/
-pdflatex main.tex
-biber main
-pdflatex main.tex
-pdflatex main.tex
-```
 
 ## Arborescence
 
@@ -28,53 +44,43 @@ report/
 ├── preamble/
 │   ├── packages.tex              # Tous les packages (newtxtext, biblatex IEEE, etc.)
 │   ├── style.tex                 # Mise en page (marges, interligne, en-têtes)
-│   └── commands.tex              # Commandes perso (figplaceholder, VP/VN/FP/FN)
+│   └── commands.tex              # Commandes perso (notation VP/VN/FP/FN, acronymes)
 ├── frontmatter/
-│   ├── pagedegarde.tex           # ← À PERSONNALISER : école, encadrants, jury
+│   ├── pagedegarde.tex           # École, encadrante, titre (jury à compléter)
 │   ├── dedicace.tex              # Optionnel
-│   ├── remerciements.tex         # ← À PERSONNALISER : noms
+│   ├── remerciements.tex         # Rédigés
 │   ├── resume.tex                # Résumé FR + Abstract EN (≤ 250 mots chacun)
 │   └── acronymes.tex             # Liste des abréviations
 ├── chapters/
 │   ├── 01_introduction.tex       # Contexte, état de l'art bref, contribs, plan
-│   ├── 02_etat_art.tex           # Clinique, RR, datasets, approches
+│   ├── 02_etat_art.tex           # Clinique, RR, datasets, 4 familles d'approches
 │   ├── 03_methodes.tex           # Pipeline, modèle, critères (PDF Critères inclus)
-│   ├── 04_resultats.tex          # Phases 1→6, tables avec [XX] à remplir
+│   ├── 04_resultats.tex          # Phases 1→6 + incertitude, seuil, charge de FA
 │   ├── 05_discussion.tex         # Comparaison littérature, limitations
 │   └── 06_conclusion.tex         # Récap + perspectives
 ├── backmatter/
-│   └── annexes.tex
+│   └── annexes.tex               # Espaces Optuna réels + captures d'écran
 ├── bibliography/
 │   └── references.bib            # Format BibTeX, style IEEE (équivalent Sayadi)
-└── figures/                      # Recevra les .pdf 300 dpi à venir
+└── figures/                      # 32 PDF vectoriels ou 300 dpi + captures d'écran
 ```
 
-## À remplir (recherche les marqueurs)
+## État du document
 
-| Marqueur                | Où                                | Action                                    |
-|-------------------------|-----------------------------------|-------------------------------------------|
-| `[NOM DE L'UNIVERSITÉ]` | `frontmatter/pagedegarde.tex`     | Renseigner l'établissement                |
-| `[NOM DE L'ÉCOLE...]`   | `frontmatter/pagedegarde.tex`     | Renseigner l'école / faculté              |
-| `[Nom Prénom — Grade]`  | `frontmatter/pagedegarde.tex`     | Encadrants + jury                         |
-| Logos école / univ.     | `frontmatter/pagedegarde.tex`     | Décommenter `\includegraphics{logos/...}` |
-| `[Nom de l'encadrant…]` | `frontmatter/remerciements.tex`   | Personnaliser les remerciements           |
-| `[À COMPLÉTER]`         | `frontmatter/resume.tex`          | Métriques finales chiffrées               |
-| `[XX]`                  | `chapters/04_resultats.tex`       | Valeurs numériques des tables             |
-| `[À PRÉCISER]`          | `chapters/03_methodes.tex` §3.5   | GPU et CPU utilisés                       |
-| `\figplaceholder{…}`    | partout                           | Remplacer par `\includegraphics{...}`     |
-| `[À COMPLÉTER : URL…]`  | `backmatter/annexes.tex`          | Lien GitHub                               |
-| Stub `XX_baseline_gb`   | `bibliography/references.bib`     | Compléter la référence manquante          |
+Le mémoire est complet et compile sans avertissement de référence non résolue.
+Les valeurs numériques proviennent toutes des fichiers JSON de `reports/` ; aucune
+n'est saisie à la main dans le LaTeX.
 
-## Placeholders figures
-
-Tous les placeholders ont la forme :
-```latex
-\figplaceholder[<largeur>][<hauteur>]{Description de la figure}
-```
-Pour insérer la vraie figure, remplacer cette ligne par :
-```latex
-\includegraphics[width=0.85\linewidth]{figures/nom_du_fichier.pdf}
-```
+| Élément | État |
+|---|---|
+| Page de garde (école, encadrante, titre) | ✅ renseignée |
+| Membres du jury | ⬜ à compléter une fois le jury désigné |
+| Remerciements, dédicace | ✅ rédigés |
+| Résumé FR + abstract EN | ✅ chiffres finaux intégrés |
+| Chapitres 1 à 5 + conclusion | ✅ rédigés |
+| Figures | ✅ 20 figures insérées (sur 32 disponibles dans `figures/`) |
+| Annexes | ✅ espaces de recherche Optuna réels + captures de l'application |
+| Bibliographie | ✅ 22 références citées, style IEEE |
 
 ## Conformité aux directives
 
@@ -86,7 +92,8 @@ Pour insérer la vraie figure, remplacer cette ligne par :
 - ✅ Équations numérotées par chapitre
 - ✅ Figures avec axes + légende explicite + numérotation par chapitre
 - ✅ Pas de cadres (`\fbox`) — utilisation des environnements natifs `algorithm`, `figure`, `table`
-- ✅ Algorithmes encadrés avec titre (`algorithm` + `algpseudocode`)
+- ✅ Algorithmes en pseudo-code, encadrés avec titre (`algorithm` + `algpseudocode`)
 - ✅ Biblio numérotée, ordre de citation (style IEEE)
 - ✅ Notation VP / VN / FP / FN conforme au PDF Critères
-- ✅ Formules d'évaluation conformes au PDF Critères (équations 3.1 à 3.6)
+- ✅ Formules d'évaluation conformes au PDF Critères (équations du chapitre 3)
+- ✅ Incertitude quantifiée (IC 95 % par bootstrap, écart-type inter-plis, test apparié)

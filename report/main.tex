@@ -20,7 +20,8 @@
 \begin{document}
 
 % ----- Pages liminaires ------------------------------------------------
-\pagenumbering{roman}
+% Numérotation arabe continue sur tout le document (1, 2, 3, …).
+\pagenumbering{arabic}
 
 \input{frontmatter/pagedegarde}
 \cleardoublepage
@@ -29,9 +30,6 @@
 \cleardoublepage
 
 \input{frontmatter/remerciements}
-\cleardoublepage
-
-\input{frontmatter/resume}
 \cleardoublepage
 
 \tableofcontents
@@ -48,14 +46,17 @@
 \cleardoublepage
 
 % ----- Corps du mémoire ------------------------------------------------
-\pagenumbering{arabic}
-\setcounter{page}{1}
-
+% Introduction générale (non numérotée) — distincte des introductions
+% propres à chaque chapitre.
 \input{chapters/01_introduction}
+
+% Chapitres numérotés 1 à 4
 \input{chapters/02_etat_art}
 \input{chapters/03_methodes}
 \input{chapters/04_resultats}
 \input{chapters/05_discussion}
+
+% Conclusion générale (non numérotée)
 \input{chapters/06_conclusion}
 
 % ----- Bibliographie ---------------------------------------------------
@@ -67,5 +68,9 @@
 % ----- Annexes ---------------------------------------------------------
 \appendix
 \input{backmatter/annexes}
+
+% ----- Résumé / Abstract (dernière page) -------------------------------
+\cleardoublepage
+\input{frontmatter/resume}
 
 \end{document}

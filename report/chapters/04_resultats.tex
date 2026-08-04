@@ -9,12 +9,16 @@
 \chapter{Résultats expérimentaux}
 \label{ch:resultats}
 
+\section{Introduction}
+\label{sec:res:intro}
+Ce chapitre présente les résultats obtenus au fil des six phases du projet, en suivant la méthodologie décrite au chapitre~\ref{ch:methodes}. Chaque phase est illustrée par les figures et tableaux correspondants : exploration des données (phase~1), méthodes de référence (phase~2), modèle \CNN--\LSTM{} optimisé (phase~3), étude de compression (phase~4), robustesse cross-dataset (phase~5) et application interactive (phase~6). Les résultats sont d'abord décrits, puis brièvement commentés ; leur interprétation approfondie est reportée au chapitre~\ref{ch:discussion}.
+
 % --- 4.1 Phase 1 — EDA ----------------------------------------------
 \section{Phase 1 — Exploration des données}
 \label{sec:res:eda}
 
 \subsection{Prévalence de la \FA{} par patient}
-La répartition de la prévalence de la \FA{} parmi les 25~patients d'AFDB est rapportée à la figure~\ref{fig:res:prevalence}. La prévalence par patient s'étend de \texttt{[XX]\%} à \texttt{[XX]\%} avec une médiane de \texttt{[XX]\%}, ce qui confirme une \keyword{forte hétérogénéité inter-patients}.
+La répartition de la prévalence de la \FA{} parmi les 25~patients d'AFDB est rapportée à la figure~\ref{fig:res:prevalence}. La prévalence par patient s'étend de moins de 1~\% à 100~\% (deux patients sont intégralement en \FA{}), avec une médiane de 24~\% pour une moyenne de 41~\%, ce qui confirme une \keyword{forte hétérogénéité inter-patients}.
 
 \begin{figure}[H]
   \centering
@@ -24,7 +28,7 @@ La répartition de la prévalence de la \FA{} parmi les 25~patients d'AFDB est r
 \end{figure}
 
 \subsection{Distribution des intervalles \RR{}}
-Les distributions conditionnelles des \RR{} en rythme sinusal et en \FA{} sont présentées à la figure~\ref{fig:res:rr_dist}. La distribution en \FA{} est sensiblement plus étalée et plus asymétrique, ce qui justifie l'utilisation d'un descripteur de variabilité comme entrée du modèle.
+Les distributions conditionnelles des \RR{} en rythme sinusal et en \FA{} sont présentées à la figure~\ref{fig:res:rr_dist}. La distribution en \FA{} est sensiblement plus étalée et plus asymétrique, ce qui justifie l'utilisation d'un descripteur de variabilité comme entrée du modèle. On notera cependant que les deux distributions se \emph{recouvrent} largement : la valeur d'un intervalle \RR{} pris isolément ne permet pas de trancher, seule la structure de leur succession est informative.
 
 \begin{figure}[H]
   \centering
@@ -33,36 +37,81 @@ Les distributions conditionnelles des \RR{} en rythme sinusal et en \FA{} sont p
   \label{fig:res:rr_dist}
 \end{figure}
 
+\subsection{Structure de la variabilité : le diagramme de Poincaré}
+Le diagramme de Poincaré, qui porte chaque intervalle \RR{} en fonction du précédent, rend cette structure directement visible (figure~\ref{fig:res:poincare}). En rythme sinusal, les points se concentrent en un nuage allongé et étroit le long de la diagonale : chaque battement ressemble au précédent. En \FA{}, le nuage se disperse en un large disque, signature de l'absence totale de corrélation entre battements successifs.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{figures/04_poincare_afib_vs_nsr.pdf}
+  \caption{Diagrammes de Poincaré (\(\RR{}_{n+1}\) en fonction de \(\RR{}_n\)) en rythme sinusal et en fibrillation auriculaire. La dispersion du nuage est la manifestation géométrique de l'irrégularité du rythme.}
+  \label{fig:res:poincare}
+\end{figure}
+
+Cette observation est le fondement de tout le travail : elle explique pourquoi des descripteurs de dispersion tels que le RMSSD ou le coefficient de variation captent l'essentiel du signal, et pourquoi un modèle séquentiel peut espérer faire mieux en exploitant l'ordre des battements.
+
+\subsection{Aperçu des séries brutes}
+La figure~\ref{fig:res:raw} illustre enfin quelques tachogrammes réels. Les transitions entre rythme sinusal et \FA{} y apparaissent parfois franches, parfois graduelles — une ambiguïté qui se répercute directement sur l'étiquetage des fenêtres situées à cheval sur une transition.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{figures/05_raw_rr_examples.pdf}
+  \caption{Exemples de séries \RR{} brutes, avec les épisodes de \FA{} annotés par les experts.}
+  \label{fig:res:raw}
+\end{figure}
+
 % --- 4.2 Phase 2 — Baselines -----------------------------------------
 \section{Phase 2 — Méthodes de référence}
 \label{sec:res:baselines}
 
-Les performances des quatre baselines sous validation croisée à 5~plis patient-level sont rapportées à la table~\ref{tab:res:baselines}.
+Les performances des cinq méthodes de référence sous validation croisée à 5~plis patient-level sont rapportées à la table~\ref{tab:res:baselines}.
 
 \begin{table}[H]
   \centering
-  \caption{Performance des baselines (médiane $\pm$ IQR sur 25~patients, AFDB).}
+  \caption{Performance des méthodes de référence (validation croisée 5~plis à l'échelle du patient, AFDB, fenêtre de 60~battements, seuil 0,5). Le \(F_1\) par patient est moyenné sur les 23~patients notables ; l'intervalle de confiance à 95~\% est obtenu par bootstrap sur les patients et \(\sigma_{\text{plis}}\) est l'écart-type entre les cinq plis. \AUROC{}, sensibilité et spécificité sont calculés au niveau de la fenêtre.}
   \label{tab:res:baselines}
-  \begin{tabular}{lcccc}
+  \begin{tabular}{lccccc}
     \toprule
-    \textbf{Méthode} & \textbf{F1 patient} & \textbf{\AUROC{}} & \textbf{Sensibilité} & \textbf{Spécificité} \\
+    \textbf{Méthode} & \textbf{F1 patient} & \textbf{IC 95 \%} & \(\sigma_{\text{plis}}\) & \textbf{\AUROC{}} & \textbf{Sens. / Spéc.} \\
     \midrule
-    Règle métier            & [XX] & [XX] & [XX] & [XX] \\
-    Forêt aléatoire         & [XX] & [XX] & [XX] & [XX] \\
-    Gradient boosting       & [XX] & [XX] & [XX] & [XX] \\
-    \CNN{} 1D               & [XX] & [XX] & [XX] & [XX] \\
+    Règle métier            & 0,635 & [0,50 ; 0,77] & 0,109 & 0,906 & 0,88 / 0,78 \\
+    Forêt aléatoire (HRV)   & 0,850 & [0,77 ; 0,92] & 0,095 & 0,988 & 0,93 / 0,95 \\
+    Gradient boosting (HRV) & \textbf{0,883} & [0,80 ; 0,94] & \textbf{0,060} & 0,992 & 0,96 / 0,96 \\
+    \CNN{} 1D seul          & 0,653 & [0,51 ; 0,79] & 0,178 & 0,930 & 0,93 / 0,80 \\
+    \LSTM{} seul            & 0,631 & [0,49 ; 0,77] & 0,193 & 0,922 & 0,90 / 0,75 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Les résultats montrent que \texttt{[À COMPLÉTER]}. Une remarque centrale ressort : \emph{aucune} des baselines ne dépasse un \(F_1\) patient de \texttt{[XX]}, ce qui suggère un plafond intrinsèque difficile à franchir avec ces seules approches.
+Deux familles de méthodes se détachent nettement. Les classifieurs exploitant des descripteurs \keyword{HRV} — forêt aléatoire et gradient boosting — atteignent les meilleurs \(F_1\) par patient (respectivement 0,850 et 0,883), tandis que les approches opérant directement sur la séquence \RR{} brute (règle métier, \CNN{} 1D, \LSTM{} seul) plafonnent autour de 0,63--0,65. Ce résultat, contre-intuitif à l'ère de l'apprentissage profond, s'explique par des décennies d'ingénierie de descripteurs HRV dédiés à la \FA{} : sur un effectif aussi restreint (23~patients notables), ces descripteurs encapsulent une connaissance a priori que le réseau doit, lui, réapprendre à partir des données.
+
+Un second enseignement se lit dans les colonnes d'incertitude, et il tempère le premier. Les intervalles de confiance sont \emph{larges} — celui du gradient boosting couvre à lui seul près de quinze points — car ils reposent sur 23~sujets seulement. Ils se chevauchent d'ailleurs entre plusieurs méthodes, ce qui interdit de conclure à partir de la seule comparaison des moyennes. La section~\ref{sec:res:incertitude} montre comment une comparaison \emph{appariée} lève cette ambiguïté. On notera par ailleurs que le gradient boosting est aussi la méthode la plus \emph{stable} d'un pli à l'autre (\(\sigma_{\text{plis}} = 0{,}060\), contre 0,178 et 0,193 pour les réseaux mono-architecture) : les descripteurs HRV ne se contentent pas d'être plus performants, ils sont également moins sensibles au découpage des patients.
+
+Les courbes ROC et précision-rappel correspondantes (figure~\ref{fig:res:baselines_roc}) confirment ce classement au niveau de la fenêtre, avec un net décrochage de la règle métier et des deux réseaux mono-architecture.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/06_baselines_roc_pr.pdf}
+  \caption{Courbes ROC (à gauche) et précision-rappel (à droite) des méthodes de référence, calculées sur les scores hors-pli au niveau de la fenêtre.}
+  \label{fig:res:baselines_roc}
+\end{figure}
+
+Il est enfin instructif de regarder \emph{quels} descripteurs HRV portent la décision. La figure~\ref{fig:res:hrv_importance} donne l'importance attribuée par la forêt aléatoire : les descripteurs de dispersion des différences successives dominent largement les statistiques de position, ce qui rejoint exactement la lecture géométrique du diagramme de Poincaré (figure~\ref{fig:res:poincare}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/09_hrv_feature_importance.pdf}
+  \caption{Importance des huit descripteurs HRV selon la forêt aléatoire.}
+  \label{fig:res:hrv_importance}
+\end{figure}
+
+Les méthodes de référence fixent ainsi une borne exigeante (\(F_1\) patient \(\approx 0{,}88\)) ; la section~\ref{sec:res:cnnlstm} examine dans quelle mesure le modèle profond proposé s'en approche, tout en offrant un traitement de bout en bout et une empreinte mémoire réduite.
 
 % --- 4.3 Phase 3 — CNN-LSTM + Optuna --------------------------------
 \section{Phase 3 — Modèle \CNN--\LSTM{} optimisé}
 \label{sec:res:cnnlstm}
 
 \subsection{Recherche d'hyperparamètres}
-Optuna a exploré \texttt{[XX]} essais sur \texttt{[XX]} heures. La distribution des scores et l'importance relative des hyperparamètres sont présentées à la figure~\ref{fig:res:optuna}.
+Optuna a exploré 30 essais. La distribution des scores et l'importance relative des hyperparamètres sont présentées à la figure~\ref{fig:res:optuna}.
 
 \begin{figure}[H]
   \centering
@@ -72,27 +121,31 @@ Optuna a exploré \texttt{[XX]} essais sur \texttt{[XX]} heures. La distribution
 \end{figure}
 
 \subsection{Performance du modèle retenu}
-La table~\ref{tab:res:cnnlstm} compare le modèle retenu aux meilleures baselines.
+La table~\ref{tab:res:cnnlstm} compare le modèle hybride proposé à la meilleure méthode de référence et à ses variantes mono-architecture.
 
 \begin{table}[H]
   \centering
-  \caption{Comparaison du \CNN--\LSTM{} optimisé aux baselines.}
+  \caption{Comparaison du \CNN--\LSTM{} optimisé à la meilleure méthode de référence et à ses composantes (scores hors-pli, validation croisée 5~plis groupée par patient, AFDB, fenêtre 60, seuil 0,5). Toutes les lignes sont évaluées sur exactement les mêmes fenêtres et le même découpage.}
   \label{tab:res:cnnlstm}
-  \begin{tabular}{lcccc}
+  \begin{tabular}{lccccc}
     \toprule
-    \textbf{Méthode} & \textbf{F1 patient} & \textbf{\AUROC{}} & \textbf{Sens.} & \textbf{Spéc.} \\
+    \textbf{Méthode} & \textbf{Param.} & \textbf{F1 patient} & \textbf{IC 95 \%} & \textbf{\AUROC{}} & \textbf{Sens. / Spéc.} \\
     \midrule
-    Meilleure baseline (GB) & [XX] & [XX] & [XX] & [XX] \\
-    \CNN--\LSTM{} (initial) & [XX] & [XX] & [XX] & [XX] \\
-    \CNN--\LSTM{} (Optuna)  & [XX] & [XX] & [XX] & [XX] \\
+    Gradient boosting (HRV)         & ---     & \textbf{0,883} & [0,80 ; 0,94] & 0,992 & 0,96 / 0,96 \\
+    \CNN{} 1D seul                  & 2\,817   & 0,653 & [0,51 ; 0,79] & 0,930 & 0,93 / 0,80 \\
+    \LSTM{} seul                    & 9\,025   & 0,631 & [0,49 ; 0,77] & 0,922 & 0,90 / 0,75 \\
+    \CNN--\LSTM{} proposé           & 100\,193 & 0,717 & [0,60 ; 0,83] & 0,971 & 0,93 / 0,89 \\
+    \CNN--\LSTM{} compact           & 30\,657  & 0,680 & [0,54 ; 0,81] & 0,959 & 0,95 / 0,84 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-L'amélioration apportée par l'optimisation Optuna est de \texttt{[XX]} points de \(F_1\) en valeur absolue par rapport au modèle initial.
+Deux enseignements ressortent. D'une part, le \CNN--\LSTM{} hybride (\(F_1\) patient de 0,717) dépasse ses composantes prises isolément — \CNN{} 1D seul (0,653) et \LSTM{} seul (0,631) —, ce qui valide l'intérêt de combiner extraction convolutionnelle et modélisation récurrente. D'autre part, il n'égale pas le gradient boosting sur descripteurs HRV (0,883) en \(F_1\) par patient, tout en conservant un pouvoir discriminant élevé (\AUROC{} de 0,971). La valeur du modèle profond se situe donc ailleurs que dans le \(F_1\) brut : un traitement \emph{de bout en bout} sans extraction manuelle de descripteurs, une empreinte mémoire réduite (section~\ref{sec:res:compression}) et une robustesse cross-dataset (section~\ref{sec:res:cross}).
+
+La variante \keyword{compacte} à 30\,k paramètres perd 3,7~points de \(F_1\) par patient par rapport à la version à 100\,k (0,680 contre 0,717), pour une empreinte trois fois moindre et un \AUROC{} pratiquement inchangé (0,959 contre 0,971). C'est elle qui est retenue pour le déploiement embarqué et pour toutes les expériences des phases~4b et~5 : le tableau de compression de la section~\ref{sec:res:compression} et les résultats de transfert de la section~\ref{sec:res:cross} sont donc à lire par rapport à cette référence de 0,680, et non de 0,717.
 
 \subsection{Étude d'ablation}
-Une étude d'ablation a été menée pour quantifier la contribution de chaque composant ; ses résultats apparaissent à la figure~\ref{fig:res:ablation}.
+Une étude d'ablation a été menée pour quantifier la contribution de chaque composant ; ses résultats apparaissent à la figure~\ref{fig:res:ablation}. Le retrait de la branche convolutionnelle ou de la couche récurrente ne dégrade que marginalement le \(F_1\) par patient (de 0,655 à environ 0,650), tandis que l'allongement de la fenêtre de 30 à 60~battements constitue le facteur le plus déterminant (0,655~$\rightarrow$~0,732) : c'est la longueur de contexte temporel, davantage que le détail de l'architecture, qui pèse le plus sur la performance.
 
 \begin{figure}[H]
   \centering
@@ -100,6 +153,116 @@ Une étude d'ablation a été menée pour quantifier la contribution de chaque c
   \caption{Étude d'ablation des composants du modèle.}
   \label{fig:res:ablation}
 \end{figure}
+
+Ce constat a une portée pratique directe : il a motivé la reprise complète de la recherche d'hyperparamètres à \(W = 60\) (phase~3.5), plutôt que la poursuite du raffinement architectural.
+
+\subsection{Dynamique d'apprentissage}
+Les courbes d'apprentissage du modèle compact (figure~\ref{fig:res:learning}) montrent une convergence rapide : l'essentiel du gain est acquis en quelques époques, et la perte de validation cesse de progresser bien avant la douzième. Ce comportement justifie a posteriori le budget de 12~époques avec un arrêt anticipé de patience~3 : allonger l'entraînement n'apporterait rien et exposerait au sur-ajustement, l'écart entre perte d'apprentissage et perte de validation se creusant régulièrement.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/17_phase35_learning_curves.pdf}
+  \caption{Courbes d'apprentissage du \CNN--\LSTM{} compact : perte d'apprentissage et de validation, \AUROC{} et \(F_1\) de validation au fil des époques.}
+  \label{fig:res:learning}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/18_phase35_roc_pr.pdf}
+  \caption{Courbes ROC et précision-rappel du \CNN--\LSTM{} compact sur les scores hors-pli.}
+  \label{fig:res:cnnlstm_roc}
+\end{figure}
+
+% --- 4.3 bis — Incertitude, seuil, origine du plafond ----------------
+\section{Analyse de la comparaison : incertitude, seuil et origine du plafond}
+\label{sec:res:incertitude}
+
+Les sections précédentes ont comparé des moyennes. Trois questions restent ouvertes : l'écart entre les deux familles de méthodes est-il significatif ? le seuil de décision fixé à 0,5 est-il le bon ? et d'où vient exactement l'écart entre le \(F_1\) par fenêtre et le \(F_1\) par patient ? Cette section y répond au moyen de trois analyses complémentaires menées sur les mêmes scores hors-pli.
+
+\subsection{L'écart entre les deux familles est-il significatif ?}
+
+La figure~\ref{fig:res:ci} présente les intervalles de confiance à 95~\% de toutes les méthodes. Leur largeur est la première information à retenir : avec 23~patients, un intervalle couvre typiquement 15 à 25~points de \(F_1\). Ceux du gradient boosting ([0,80 ; 0,94]) et du \CNN--\LSTM{} à 100\,k ([0,60 ; 0,83]) se chevauchent, ce qui, pris littéralement, interdirait de départager les deux méthodes.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/19_confidence_intervals.pdf}
+  \caption{\(F_1\) moyen par patient et intervalle de confiance à 95~\% obtenu par bootstrap sur les 23~patients notables d'AFDB. La largeur des intervalles traduit le faible effectif, non l'instabilité des modèles.}
+  \label{fig:res:ci}
+\end{figure}
+
+Cette lecture est toutefois trop conservatrice, car les deux méthodes sont évaluées \emph{sur les mêmes patients}. La comparaison appariée décrite en section~\ref{sec:meth:incertitude} est nettement plus informative : la différence moyenne de \(F_1\) patient par patient entre le gradient boosting et le \CNN--\LSTM{} à 100\,k vaut \(+0{,}167\), avec un intervalle de confiance à 95~\% de \([+0{,}076 ;\ +0{,}272]\). Cet intervalle \emph{exclut zéro}, et le gradient boosting l'emporte sur \textbf{20~patients sur 23}. La supériorité des descripteurs HRV sur ce jeu de données est donc un résultat solide, et non un artefact de moyenne.
+
+\subsection{Ce que coûte le seuil fixé à 0,5}
+
+Tous les résultats rapportés jusqu'ici utilisent un seuil de décision de 0,5. Or les réseaux ont été entraînés avec une perte pondérée en faveur de la classe positive (section~\ref{sec:meth:entrainement}), ce qui décale leurs probabilités vers le haut : rien ne garantit que 0,5 soit le bon point de coupure. La figure~\ref{fig:res:threshold} trace le \(F_1\) par patient en fonction du seuil.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/20_threshold_sensitivity.pdf}
+  \caption{\(F_1\) moyen par patient en fonction du seuil de décision. Les modèles profonds atteignent leur optimum vers 0,83--0,85, très au-dessus du seuil de 0,5 effectivement utilisé ; les méthodes HRV sont beaucoup plus plates autour de leur optimum.}
+  \label{fig:res:threshold}
+\end{figure}
+
+La table~\ref{tab:res:threshold} chiffre quatre régimes de choix du seuil.
+
+\begin{table}[H]
+  \centering
+  \caption{Effet du choix du seuil sur le \(F_1\) moyen par patient. Le régime \emph{imbriqué} est le seul honnête : le seuil est choisi sur les quatre autres plis, puis appliqué au pli courant. Le régime \emph{oracle} suppose un seuil optimal propre à chaque patient — irréalisable en pratique, il borne le gain qu'un calibrage individuel pourrait apporter.}
+  \label{tab:res:threshold}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Méthode} & \textbf{Seuil 0,5} & \textbf{Imbriqué} & \textbf{Optimum global} & \textbf{Oracle/patient} \\
+    \midrule
+    Forêt aléatoire (HRV)  & 0,850 & 0,846 & 0,863 \,(t*\,=\,0,47) & 0,937 \\
+    Gradient boosting (HRV) & 0,883 & 0,888 & 0,888 \,(t*\,=\,0,77) & 0,925 \\
+    \CNN--\LSTM{} 100\,k   & 0,717 & \textbf{0,749} & 0,743 \,(t*\,=\,0,83) & 0,798 \\
+    \CNN--\LSTM{} 30\,k    & 0,680 & \textit{0,625} & 0,709 \,(t*\,=\,0,85) & 0,771 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Trois observations en découlent. D'abord, le seuil optimal des modèles profonds se situe vers 0,83--0,85, soit très loin de 0,5 : la pondération de la classe positive décale bien les probabilités, comme anticipé. Ensuite, le gain \emph{réalisable} est réel mais modeste et instable : le \CNN--\LSTM{} à 100\,k gagne 3,2~points en régime imbriqué (0,717~$\rightarrow$~0,749), tandis que la variante à 30\,k en \emph{perd} 5,5 (0,680~$\rightarrow$~0,625), le seuil appris sur quatre plis se transférant mal au cinquième. Avec si peu de patients, régler le seuil sur les données revient largement à ajuster du bruit. Enfin, même le régime oracle — qui suppose connue la vérité terrain de chaque patient — plafonne à 0,798 pour le modèle profond, contre 0,925 pour le gradient boosting.
+
+Ces résultats conduisent à conserver le seuil de 0,5 dans tout le mémoire, mais à nuancer la notion de « plafond » : une partie de l'écart entre les 0,72 du modèle profond et les 0,88 du gradient boosting relève d'un problème de calibration, non de pouvoir discriminant. C'est cohérent avec un \AUROC{} de 0,971 — une métrique, elle, indépendante du seuil.
+
+\subsection{\texorpdfstring{D'où vient l'écart entre \(F_1\) par fenêtre et \(F_1\) par patient}{D'ou vient l'ecart entre F1 par fenetre et F1 par patient}}
+
+La figure~\ref{fig:res:winvspat} met côte à côte les deux protocoles d'évaluation pour l'ensemble des méthodes. L'écart est systématique et important : de 7~points pour le gradient boosting jusqu'à 20~points pour le \CNN--\LSTM{} compact.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/22_window_vs_patient.pdf}
+  \caption{\(F_1\) mesuré par fenêtre (barres claires) et par patient (barres foncées) pour chaque méthode, sur exactement les mêmes prédictions. Seul le mode d'agrégation change.}
+  \label{fig:res:winvspat}
+\end{figure}
+
+L'origine de cet écart est identifiable. La figure~\ref{fig:res:burden} relie le \(F_1\) de chaque patient à sa \keyword{charge de \FA{}}, c'est-à-dire à la proportion de ses fenêtres qui sont positives.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/21_f1_vs_afib_burden.pdf}
+  \caption{\(F_1\) de chaque patient en fonction de sa charge de \FA{} (échelle logarithmique). En dessous de 10~\% de fenêtres positives, la performance s'effondre — et bien plus brutalement pour le modèle profond que pour le gradient boosting.}
+  \label{fig:res:burden}
+\end{figure}
+
+Le contraste est net, et il est chiffré à la table~\ref{tab:res:burden}. Les huit patients dont moins de 10~\% de l'enregistrement est en \FA{} tirent la moyenne vers le bas de façon décisive ; certains d'entre eux ne comptent que quelques dizaines de fenêtres positives sur plus de mille, si bien qu'une poignée de fausses alarmes suffit à effondrer la précision, donc le \(F_1\). La moyenne par patient, en donnant à ces sujets le même poids qu'aux autres, rend visible une difficulté que le \(F_1\) par fenêtre dissimule complètement.
+
+\begin{table}[H]
+  \centering
+  \caption{\(F_1\) moyen par patient selon la charge de \FA{} du sujet (AFDB, seuil 0,5).}
+  \label{tab:res:burden}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Méthode} & \textbf{Charge \(<\) 10 \%} & \textbf{Charge \(\geq\) 10 \%} & \textbf{Écart} \\
+                     & (8 patients) & (15 patients) & \\
+    \midrule
+    Gradient boosting (HRV) & 0,773 & 0,942 & \(-0{,}169\) \\
+    \CNN--\LSTM{} 100\,k    & 0,457 & 0,855 & \(-0{,}398\) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Ce tableau apporte surtout une explication à la supériorité des descripteurs HRV. Sur les patients à forte charge de \FA{}, les deux familles sont proches (0,942 contre 0,855). C'est sur les patients à \emph{faible} charge que l'écart se creuse : 0,773 contre 0,457, soit plus de trente points. Autrement dit, la difficulté du réseau profond n'est pas de reconnaître la \FA{} en général, mais de rester spécifique lorsque les épisodes sont rares — précisément le régime de la \FA{} paroxystique, qui est aussi le plus intéressant cliniquement.
 
 % --- 4.4 Phase 4 — Compression --------------------------------------
 \section{Phase 4 — Étude de compression}
@@ -109,25 +272,25 @@ Les huit variantes de compression évaluées sont synthétisées à la table~\re
 
 \begin{table}[H]
   \centering
-  \caption{Compromis taille / performance des variantes de compression.}
+  \caption{Compromis taille / performance des variantes de compression (modèle compact \(\approx\)30\,k, 5-fold OOF AFDB). \(\Delta F_1\) en points de \(F_1\) par patient vis-à-vis de la référence FP32 ; latence d'inférence \textit{single-window} sur CPU.}
   \label{tab:res:compression}
   \begin{tabular}{lcccc}
     \toprule
-    \textbf{Variante} & \textbf{Taille (KB)} & \textbf{F1 patient} & \(\Delta\)F1 & \textbf{Latence (ms)} \\
+    \textbf{Variante} & \textbf{Taille (KB)} & \textbf{F1 patient} & \(\Delta F_1\) (pts) & \textbf{Latence p50 (ms)} \\
     \midrule
-    V0 — référence FP32          & [XX] & [XX] & 0 & [XX] \\
-    V1 — pruning 30~\%           & [XX] & [XX] & [XX] & [XX] \\
-    V2 — pruning + fine-tune     & [XX] & [XX] & [XX] & [XX] \\
-    V3 — quant. dynamique        & [XX] & [XX] & [XX] & [XX] \\
-    V4 — quant. statique INT8    & 87   & [XX] & [XX] & [XX] \\
-    V5 — ONNX FP32               & [XX] & [XX] & [XX] & [XX] \\
-    V6 — ONNX + quant.           & [XX] & [XX] & [XX] & [XX] \\
-    V7 — pruning + INT8          & [XX] & [XX] & [XX] & [XX] \\
+    Référence FP32              & 133 & 0,680 & ---     & 0,33 \\
+    Pruning 30~\%               & 133 & 0,678 & \(-0{,}2\) & 0,32 \\
+    Pruning 50~\%               & 133 & 0,678 & \(-0{,}2\) & 0,32 \\
+    Pruning 70~\%               & 133 & 0,594 & \(-8{,}6\) & 0,32 \\
+    Pruning 70~\% + fine-tune   & 133 & 0,682 & \(+0{,}2\) & 0,31 \\
+    Quant. INT8 dynamique       & \textbf{87} & 0,680 & \(0{,}0\) & 0,45 \\
+    Pruning 50~\% + INT8        & \textbf{87} & 0,678 & \(-0{,}2\) & 0,44 \\
+    Export ONNX FP32            & 184 & 0,680 & \(0{,}0\) & \textbf{0,05} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-La variante V4 a atteint la cible des 200~KB visée pour l'embarqué (87~KB obtenus) avec une perte de \(F_1\) inférieure à \texttt{[XX]} points. Le compromis taille / performance est visualisé à la figure~\ref{fig:res:pareto}.
+La quantification INT8 dynamique ramène l'empreinte mémoire de 133 à \textbf{87~KB} — bien en deçà de la cible de 200~KB visée pour l'embarqué — \emph{sans aucune perte} de \(F_1\) par patient (0,680~$\rightarrow$~0,680). Le pruning agressif à 70~\% dégrade nettement la performance (\(-8{,}6\) points), sauf lorsqu'il est suivi d'un court \textit{fine-tuning} qui la restaure intégralement. L'export ONNX, enfin, divise la latence d'inférence par sept (0,05~ms contre 0,33~ms). Le compromis taille / performance est visualisé à la figure~\ref{fig:res:pareto}.
 
 \begin{figure}[H]
   \centering
@@ -136,28 +299,46 @@ La variante V4 a atteint la cible des 200~KB visée pour l'embarqué (87~KB obte
   \label{fig:res:pareto}
 \end{figure}
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{figures/17_phase4b_latency_bar.pdf}
+  \caption{Latence d'inférence pour une fenêtre unique sur CPU, par variante (médiane et neuvième décile supérieur). Toutes les variantes restent trois ordres de grandeur en dessous de la contrainte temps réel visée.}
+  \label{fig:res:latence}
+\end{figure}
+
+Une réserve importante accompagne ces mesures de latence : elles ont été relevées sur le processeur de développement (Intel Core i7-13650HX), et non sur une cible embarquée. Un microcontrôleur de type ARM Cortex-M est deux à trois ordres de grandeur plus lent ; les valeurs rapportées ici doivent donc être lues comme une comparaison \emph{relative} entre variantes, non comme une garantie de performance sur dispositif portable. La marge disponible reste néanmoins considérable, une fenêtre de 60~battements représentant environ 45~secondes de signal pour un traitement de l'ordre de la milliseconde.
+
 % --- 4.5 Phase 5 — Cross-dataset ------------------------------------
-\section{Phase 5 — Robustesse cross-dataset (AFDB $\rightarrow$ LTAFDB)}
+\section{\texorpdfstring{Phase 5 — Robustesse cross-dataset (AFDB $\rightarrow$ LTAFDB)}{Phase 5 — Robustesse cross-dataset (AFDB vers LTAFDB)}}
 \label{sec:res:cross}
 
 Le modèle entraîné exclusivement sur AFDB a été évalué sans réentraînement sur LTAFDB. Les résultats apparaissent à la table~\ref{tab:res:cross}.
 
 \begin{table}[H]
   \centering
-  \caption{Performance du modèle final sur les deux jeux de données.}
+  \caption{Robustesse cross-dataset du modèle compact (\(F_1\) par patient, seuil 0,5). Le modèle source est entraîné sur AFDB ; il est ensuite évalué sur LTAFDB sans réentraînement (\textit{zero-shot}), puis comparé à un entraînement direct sur LTAFDB (\textit{scratch}) et à un \textit{fine-tuning}. La colonne \(n\) rappelle le nombre de patients effectivement notés dans chaque configuration.}
   \label{tab:res:cross}
-  \begin{tabular}{lccc}
+  \begin{tabular}{lcccc}
     \toprule
-    \textbf{Jeu de test} & \textbf{F1 patient} & \textbf{\AUROC{}} & \textbf{Sens.} \\
+    \textbf{Configuration} & \(n\) & \textbf{F1 patient} & \textbf{\AUROC{}} & \textbf{Sens.} \\
     \midrule
-    AFDB (interne, CV)        & [XX] & [XX] & [XX] \\
-    LTAFDB (externe)          & [XX] & [XX] & [XX] \\
-    \(\Delta\) absolu         & [XX] & [XX] & [XX] \\
+    AFDB (interne, modèle source, un seul pli) & 5  & 0,668 & 0,936 & 0,85 \\
+    LTAFDB — \textit{zero-shot} (transfert direct) & 62 & 0,713 & 0,970 & 0,97 \\
+    LTAFDB — entraîné sur place (\textit{scratch}) & 62 & 0,765 & 0,979 & 0,97 \\
+    LTAFDB — \textit{fine-tuné}                    & 62 & 0,744 & 0,970 & 0,97 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-La perte cross-dataset observée est de \texttt{[XX]} points de \(F_1\). La figure~\ref{fig:res:boxplot_cross} montre la dispersion par patient sur les deux bases.
+Contrairement à la dégradation que l'on pourrait attendre d'un changement de base, le \(F_1\) par patient est \emph{maintenu} lors du transfert : 0,713 sur LTAFDB en \keyword{zero-shot}, c'est-à-dire sans le moindre réentraînement, contre 0,765 pour un modèle entraîné directement sur LTAFDB. L'écart de transfert se limite donc à cinq points, alors que les deux bases diffèrent par le nombre de sujets, la durée des enregistrements et la fréquence d'échantillonnage (128~Hz contre 250~Hz). Le \textit{fine-tuning} ne comble pas cet écart et se situe entre les deux (0,744).
+
+Deux réserves doivent toutefois accompagner ce tableau, sous peine de sur-interpréter la ligne \textit{zero-shot}.
+
+\textbf{Les lignes ne reposent pas sur le même protocole.} La ligne AFDB provient d'un \emph{unique} pli, dont l'ensemble de validation ne compte que cinq patients notés, alors que les lignes LTAFDB agrègent cinq plis couvrant 62~patients. Un modèle source entraîné sur l'ensemble d'AFDB étant nécessaire pour le transfert, cette asymétrie est structurelle ; elle interdit néanmoins de lire la progression de 0,668 à 0,713 comme une amélioration réelle apportée par le changement de base.
+
+\textbf{LTAFDB est une base intrinsèquement plus facile.} Sa charge de \FA{} moyenne atteint 58,1~\% contre 43,6~\% pour AFDB, et ses épisodes y sont plus longs et plus soutenus. Or la section~\ref{sec:res:incertitude} a établi que la performance par patient dépend fortement de cette charge. Une partie du \(F_1\) élevé observé sur LTAFDB s'explique donc par la composition de la base, et non par la seule qualité du transfert. La conclusion défendable est que le modèle \emph{ne s'effondre pas} en changeant de conditions d'acquisition — ce qui est déjà un résultat notable — et non qu'il s'améliore.
+
+La figure~\ref{fig:res:boxplot_cross} montre la dispersion par patient sur les deux bases.
 
 \begin{figure}[H]
   \centering
@@ -166,15 +347,37 @@ La perte cross-dataset observée est de \texttt{[XX]} points de \(F_1\). La figu
   \label{fig:res:boxplot_cross}
 \end{figure}
 
+Cette dispersion est elle-même instructive : les boîtes sont larges dans toutes les configurations, et la queue basse de la distribution — quelques patients à \(F_1\) très faible — se retrouve sur LTAFDB exactement comme sur AFDB. Le phénomène décrit à la section~\ref{sec:res:incertitude} n'est donc pas propre à AFDB ; il se reproduit sur une base quatre fois plus grande, ce qui renforce l'idée qu'il s'agit d'une difficulté structurelle de la tâche et non d'un accident d'échantillonnage.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{figures/18_phase5_f1_bar.pdf}
+  \caption{Comparaison des quatre configurations de transfert (\(F_1\) par patient et par fenêtre).}
+  \label{fig:res:cross_bar}
+\end{figure}
+
 % --- 4.6 Phase 6 — Sandbox ------------------------------------------
 \section{Phase 6 — Application interactive}
 \label{sec:res:sandbox}
 
-Une application \textit{Streamlit} a été développée pour permettre l'exploration patient par patient des décisions du modèle. Elle comporte cinq onglets : \emph{Patient Inspector}, \emph{Model Showdown}, \emph{Compression Lab}, \emph{Cross-Dataset} et \emph{What-If}.
+Une application \textit{Streamlit} a été développée pour permettre l'exploration patient par patient des décisions du modèle. Elle s'organise autour d'une page d'accueil synthétisant les résultats clés (figure~\ref{fig:res:home}) et de cinq onglets : \emph{Patient Inspector}, \emph{Model Showdown}, \emph{Compression Lab}, \emph{Cross-Dataset} et \emph{What-If}.
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][7cm]{Capture d'écran de l'onglet Patient Inspector — tachogramme + probabilité prédite}
-  \caption{Capture d'écran de l'application \textit{Streamlit} (\emph{Patient Inspector}).}
+  \includegraphics[width=\linewidth,height=0.78\textheight,keepaspectratio]{screens/home.png}
+  \caption{Page d'accueil de l'application \textit{Streamlit} : indicateurs clés des cinq phases et aperçu du front de Pareto de la compression.}
+  \label{fig:res:home}
+\end{figure}
+
+L'onglet \emph{Patient Inspector} (figure~\ref{fig:res:sandbox}) superpose, pour un patient sélectionné, la vérité terrain des épisodes de \FA{} et les flux de probabilité prédits par les différentes variantes du modèle, accompagnés des métriques associées. Les onglets complémentaires (\emph{Model Showdown}, \emph{Compression Lab}, \emph{Cross-Dataset}, \emph{What-If}) sont illustrés à l'annexe~\ref{ann:screenshots}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth,height=0.78\textheight,keepaspectratio]{screens/patient_inspector.png}
+  \caption{Onglet \emph{Patient Inspector} : vérité terrain (bande supérieure) et probabilités prédites par les modèles le long des fenêtres \RR{} d'un patient.}
   \label{fig:res:sandbox}
 \end{figure}
+
+\section{Conclusion}
+\label{sec:res:conclusion}
+En résumé, ce chapitre a rassemblé les résultats quantitatifs des six phases. Sous évaluation à l'échelle du patient, les descripteurs HRV associés à un gradient boosting dominent le modèle profond de façon statistiquement établie (\(+0{,}167\) de \(F_1\) par patient, sur 20~patients sur 23). Cet écart provient très majoritairement des sujets à faible charge de \FA{}, sur lesquels le réseau perd sa spécificité. Le \CNN--\LSTM{} reste néanmoins le meilleur des modèles opérant sur la séquence brute, se comprime jusqu'à 87~KB sans aucune perte, et conserve sa performance lors d'un transfert vers une base acquise dans d'autres conditions. Une application interactive rend enfin ces décisions explorables patient par patient. Ces observations sont interprétées et confrontées à la littérature au chapitre~\ref{ch:discussion}.

@@ -12,8 +12,6 @@ from __future__ import annotations
 import streamlit as st
 
 from utils import (
-    FIGURES,
-    PROJECT_ROOT,
     header,
     kpi_row,
     load_compression_csv,

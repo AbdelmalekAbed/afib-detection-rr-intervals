@@ -1,4 +1,4 @@
-.PHONY: help setup data train eval demo test lint format clean
+.PHONY: help setup data train eval demo test lint format clean report-pdf report-clean report-watch
 
 PYTHON_VERSION ?= 3.12
 VENV           ?= .venv
@@ -17,6 +17,11 @@ help:
 	@echo "  lint     - run ruff checks"
 	@echo "  format   - run black + ruff --fix"
 	@echo "  clean    - remove caches and build artifacts"
+	@echo ""
+	@echo "Report (LaTeX):"
+	@echo "  report-pdf   - compile report/main.tex → report/main.pdf (needs texlive + biber)"
+	@echo "  report-watch - rebuild on file change (latexmk -pvc)"
+	@echo "  report-clean - remove LaTeX intermediates (report/build/)"
 
 setup:
 	$(UV) venv $(VENV) --python $(PYTHON_VERSION)
@@ -52,3 +57,24 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type d -name .pytest_cache -exec rm -rf {} +
 	find . -type d -name .ruff_cache -exec rm -rf {} +
+
+# -----------------------------------------------------------------------------
+# Report (LaTeX) — needs texlive-{latex,fonts,bibtex,science,pictures} + biber
+# -----------------------------------------------------------------------------
+report-pdf:
+	cd report && latexmk -pdf -outdir=build -interaction=nonstopmode -halt-on-error main.tex
+	cp report/build/main.pdf report/main.pdf
+	@echo "PDF: report/main.pdf"
+
+report-watch:
+	cd report && latexmk -pdf -pvc -outdir=build -interaction=nonstopmode main.tex
+
+report-clean:
+	rm -rf report/build report/main.pdf
+	# Les intermédiaires laissés à la racine de report/ par une compilation
+	# manuelle font échouer latexmk (il lance bibtex au lieu de biber en
+	# trouvant un main.bbl périmé). On les supprime aussi.
+	rm -f report/main.aux report/main.bbl report/main.bcf report/main.blg \
+	      report/main.fdb_latexmk report/main.fls report/main.lof \
+	      report/main.log report/main.lot report/main.out \
+	      report/main.run.xml report/main.toc

@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Cheikh Rouhou Ashedi", email = "ashedi.cheikhrouhou@gmail.com" }
+    { name = "Abdelmalek Abed", email = "rayenmadiouni10@gmail.com" }
 ]
 keywords = ["atrial-fibrillation", "ecg", "rr-intervals", "deep-learning", "cnn-lstm", "physionet"]
 classifiers = [
@@ -64,6 +64,13 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "SIM"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Les scripts et les pages Streamlit insèrent la racine du dépôt dans sys.path
+# avant d'importer `src`, ce qui impose des imports après du code exécutable.
+"scripts/*.py" = ["E402"]
+"app/*.py" = ["E402"]
+"app/pages/*.py" = ["E402"]
 
 [tool.black]
 line-length = 100

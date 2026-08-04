@@ -9,11 +9,16 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from utils import benchmark_latency, header, load_compression_csv, load_variant_model, state_dict_size_kb
+from utils import (
+    benchmark_latency,
+    header,
+    load_compression_csv,
+    load_variant_model,
+    state_dict_size_kb,
+)
 
 st.set_page_config(page_title="Compression Lab", page_icon="📦", layout="wide")
 

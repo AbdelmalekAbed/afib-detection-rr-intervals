@@ -42,9 +42,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.baselines.cv import zscore_per_window
-from src.data.loader import list_records, load_record_metadata
-from src.data.rr_extract import clean_rr_series, extract_rr_series
-from src.data.windowing import build_windowed_dataset
+from src.data.build import build_windows
 from src.models.cnn_lstm import CNNLSTM
 from src.utils.metrics import per_patient_f1, ranking_metrics, threshold_metrics
 from src.utils.seed import set_seed
@@ -64,20 +62,9 @@ PATIENCE = 3
 # --------------------------------------------------------------------------- #
 # Data
 # --------------------------------------------------------------------------- #
-def build_windows(dataset: str, window: int, stride: int):
-    """Build w=60 windows from raw PhysioNet data for AFDB or LTAFDB."""
-    dataset_dir = PROJECT_ROOT / "data" / "raw" / dataset
-    series_by_patient = {}
-    for rec in list_records(dataset_dir):
-        try:
-            meta = load_record_metadata(dataset_dir, rec)
-            s = clean_rr_series(extract_rr_series(meta))
-            if len(s.rr_seconds) >= window:
-                series_by_patient[rec] = s
-        except Exception:
-            continue
-    w = build_windowed_dataset(series_by_patient, window_size=window, stride=stride, label_strategy="majority")
-    return w.X.astype(np.float32), w.y.astype(np.int8), np.asarray(w.patient_id)
+def build_dataset_windows(dataset: str, window: int, stride: int):
+    """Fenêtres w=60 pour AFDB ou LTAFDB, via la fonction partagée du paquet src."""
+    return build_windows(PROJECT_ROOT / "data" / "raw" / dataset, window=window, stride=stride)
 
 
 # --------------------------------------------------------------------------- #
@@ -214,17 +201,17 @@ def main():
 
     # 1. Best params (Phase 3.5 archi)
     raw = json.loads(args.params_json.read_text())
-    best = raw["best_params"] if "best_params" in raw else raw
+    best = raw.get("best_params", raw)
     weight_decay = float(best.get("weight_decay", 0.0))
     print(f"[params] {args.params_json}: {best}")
 
     # 2. Datasets
     t0 = time.time()
-    Xa, ya, ga = build_windows("afdb", WINDOW, STRIDE)
+    Xa, ya, ga = build_dataset_windows("afdb", WINDOW, STRIDE)
     print(f"[data] AFDB w={WINDOW}: X={Xa.shape}, AFib={ya.mean():.3f}, "
           f"patients={len(np.unique(ga))} ({time.time()-t0:.1f}s)")
     t0 = time.time()
-    Xl, yl, gl = build_windows("ltafdb", WINDOW, STRIDE)
+    Xl, yl, gl = build_dataset_windows("ltafdb", WINDOW, STRIDE)
     print(f"[data] LTAFDB w={WINDOW}: X={Xl.shape}, AFib={yl.mean():.3f}, "
           f"patients={len(np.unique(gl))} ({time.time()-t0:.1f}s)")
     Xan = zscore_per_window(Xa)

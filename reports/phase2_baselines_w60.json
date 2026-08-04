@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "window": 60,
+    "stride": 30,
+    "n_splits": 5,
+    "seed": 42,
+    "n_samples": 40613,
+    "n_patients": 25,
+    "afib_rate": 0.43550094797232414
+  },
+  "results": {
+    "rule_cv": {
+      "auroc": 0.9062552200454124,
+      "auprc": 0.8076644531394075,
+      "threshold": NaN,
+      "f1": 0.8141823973264406,
+      "sensitivity": 0.8815514219483236,
+      "specificity": 0.7809473959696415,
+      "accuracy": 0.8247605446531898,
+      "mean_patient_f1": 0.6354346185705213,
+      "n_patients_scored": 23
+    },
+    "hrv_rf": {
+      "auroc": 0.9884359577337527,
+      "auprc": 0.982635507366086,
+      "threshold": 0.5,
+      "f1": 0.9333295490023558,
+      "sensitivity": 0.929609317577882,
+      "specificity": 0.9518450667364564,
+      "accuracy": 0.9421613768990225,
+      "mean_patient_f1": 0.8504278258575866,
+      "n_patients_scored": 23
+    },
+    "gb_hist": {
+      "auroc": 0.9922014596178557,
+      "auprc": 0.9877096253641302,
+      "threshold": 0.5,
+      "f1": 0.9531792396918127,
+      "sensitivity": 0.9547690394074744,
+      "specificity": 0.9625316234842537,
+      "accuracy": 0.9591510107601015,
+      "mean_patient_f1": 0.8832825453614361,
+      "n_patients_scored": 23
+    },
+    "cnn_only": {
+      "auroc": 0.9302145808184574,
+      "auprc": 0.8991750419998947,
+      "threshold": 0.5,
+      "f1": 0.852623974405284,
+      "sensitivity": 0.9341889523378752,
+      "specificity": 0.8016226118817064,
+      "accuracy": 0.8593553788195898,
+      "mean_patient_f1": 0.6532163067007656,
+      "n_patients_scored": 23
+    },
+    "lstm_only": {
+      "auroc": 0.9219734017941389,
+      "auprc": 0.8949977598819971,
+      "threshold": 0.5,
+      "f1": 0.8111656785159927,
+      "sensitivity": 0.9011703511053316,
+      "specificity": 0.7525516880397801,
+      "accuracy": 0.8172752566912073,
+      "mean_patient_f1": 0.6313967408416704,
+      "n_patients_scored": 23
+    }
+  }
+}

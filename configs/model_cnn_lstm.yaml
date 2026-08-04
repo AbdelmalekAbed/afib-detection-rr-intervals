@@ -1,25 +1,28 @@
+# Architecture retenue = « CNN-LSTM compact » de la phase 3.5 (30 657 paramètres).
+# C'est celle utilisée pour la compression (phase 4b) et le transfert (phase 5).
+# Les valeurs proviennent de reports/phase35_best_params.json (recherche Optuna).
 model:
   name: cnn_lstm
-  input_length: 30
+  input_length: 60          # doit rester égal à windowing.window_size
 
   cnn:
-    n_blocks: 2
-    channels: [16, 32]
+    n_blocks: 3
+    channels: [16, 32, 64]  # cnn_first = 16, puis doublement
     kernel_size: 5
     pool_size: 2
-    dropout: 0.2
+    dropout: 0.20027968126905468
     batch_norm: true
 
   lstm:
-    hidden_size: 32
-    num_layers: 1
+    hidden_size: 16
+    num_layers: 2
     bidirectional: true
-    dropout: 0.2
+    dropout: 0.2            # actif seulement si num_layers > 1
 
   head:
     pooling: global_avg
-    hidden: 32
-    dropout: 0.3
+    hidden: 16
+    dropout: 0.4024646756450459
 
   out_classes: 1
-  parameter_budget: 100000
+  parameter_budget: 100000  # budget du cahier des charges ; le modèle en utilise 30 657

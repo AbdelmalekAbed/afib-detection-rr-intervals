@@ -50,7 +50,7 @@ y = p["y"]
 n = len(y)
 time_idx = np.arange(n)
 
-available_variants = [k for k in p.keys() if k not in {"y", "fold", "n_windows", "afib_rate"}]
+available_variants = [k for k in p if k not in {"y", "fold", "n_windows", "afib_rate"}]
 selected = st.multiselect(
     "Variants to compare (architecture 100k params)",
     available_variants,
@@ -128,7 +128,7 @@ if afib_mask.any():
     diff = np.diff(np.concatenate([[0], afib_mask.astype(int), [0]]))
     starts = np.where(diff == 1)[0]
     ends = np.where(diff == -1)[0]
-    for s, e in zip(starts, ends):
+    for s, e in zip(starts, ends, strict=False):
         fig.add_vrect(
             x0=s, x1=e - 0.5,
             fillcolor="#d62728", opacity=0.10, line_width=0,
@@ -185,9 +185,9 @@ header("Where each variant disagrees with FP32 reference")
 if "fp32" in selected:
     ref = (p["fp32"] >= threshold).astype(int)
     st.caption(
-        f"Reference variant: **fp32** (100k params). Showing the count of windows where each "
-        f"other variant predicts something different from FP32, broken down by whether "
-        f"the divergence helped (matches GT) or hurt (mismatches GT)."
+        "Reference variant: **fp32** (100k params). Showing the count of windows where each "
+        "other variant predicts something different from FP32, broken down by whether "
+        "the divergence helped (matches GT) or hurt (mismatches GT)."
     )
     rows = []
     for v in selected:

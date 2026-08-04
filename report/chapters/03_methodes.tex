@@ -9,6 +9,10 @@
 \chapter{Matériel et méthodes}
 \label{ch:methodes}
 
+\section{Introduction}
+\label{sec:meth:intro}
+Ce chapitre décrit la démarche expérimentale suivie tout au long du travail. Il présente successivement la vue d'ensemble du pipeline, les données et leur prétraitement, les modèles étudiés (méthodes de référence et réseau \CNN--\LSTM{} proposé), la procédure d'optimisation et de compression, puis les critères d'évaluation retenus. Le souci constant de reproductibilité y est explicité, depuis l'accès aux données jusqu'à l'environnement logiciel et matériel.
+
 % --- 3.1 Vue d'ensemble ---------------------------------------------
 \section{Vue d'ensemble du pipeline}
 \label{sec:meth:pipeline}
@@ -17,7 +21,23 @@ Le pipeline complet, illustré à la figure~\ref{fig:meth:pipeline}, a été dé
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.95\linewidth][7cm]{Organigramme du pipeline : AFDB $\rightarrow$ détection R $\rightarrow$ fenêtrage $\rightarrow$ split patient-level $\rightarrow$ modèle $\rightarrow$ évaluation}
+  \begin{tikzpicture}[
+      node distance=7mm and 9mm,
+      box/.style={rectangle, rounded corners, draw, fill=blue!8,
+                  align=center, minimum height=1.05cm, text width=2.7cm, font=\small},
+      arr/.style={-{Stealth[length=2.4mm]}, line width=0.7pt}]
+    \node[box] (db) {Bases PhysioNet\\(AFDB, LTAFDB)};
+    \node[box, right=of db] (rr) {Extraction des\\intervalles \RR{}};
+    \node[box, right=of rr] (win) {Fenêtrage\\($W$ battements)};
+    \node[box, below=of win] (split) {Découpage\\\textit{patient-level}};
+    \node[box, left=of split] (model) {Modèle\\\CNN--\LSTM{}};
+    \node[box, left=of model] (eval) {Évaluation\\(F1, \AUROC{}, ROC)};
+    \draw[arr] (db) -- (rr);
+    \draw[arr] (rr) -- (win);
+    \draw[arr] (win) -- (split);
+    \draw[arr] (split) -- (model);
+    \draw[arr] (model) -- (eval);
+  \end{tikzpicture}
   \caption{Vue d'ensemble du pipeline de détection de la \FA{} adopté dans ce mémoire.}
   \label{fig:meth:pipeline}
 \end{figure}
@@ -27,31 +47,69 @@ Le pipeline complet, illustré à la figure~\ref{fig:meth:pipeline}, a été dé
 \label{sec:meth:donnees}
 
 \subsection{Source et accès}
-Les enregistrements ont été téléchargés depuis PhysioNet via la bibliothèque \texttt{wfdb}. Pour chaque enregistrement, les annotations de battements et de rythme ont été récupérées au format natif.
+Les enregistrements ont été téléchargés depuis PhysioNet \cite{goldberger2000physiobank} via la bibliothèque \texttt{wfdb}. Pour chaque enregistrement, les annotations de battements et de rythme ont été récupérées au format natif.
 
 \subsection{Construction du tachogramme}
-Pour chaque patient, la suite des intervalles \RR{} a été obtenue à partir des positions d'ondes R fournies par les annotations expertes. Aucune détection automatique de R n'a été réalisée afin d'éviter d'introduire un biais lié au détecteur.
+Pour chaque patient, la suite des intervalles \RR{} a été obtenue à partir des positions d'ondes R fournies par les annotations expertes. Aucune détection automatique de R n'a été réalisée afin d'éviter d'introduire un biais lié au détecteur. Un détail d'implémentation mérite d'être signalé : dans la base AFDB, les positions de battements et les annotations de rythme sont réparties dans \emph{deux} fichiers distincts (\texttt{.qrs} pour les battements, \texttt{.atr} pour les rythmes), alors que LTAFDB regroupe les deux dans un seul fichier. Le chargeur du dépôt détecte automatiquement le cas de figure et sélectionne la source la plus riche en battements.
+
+Le rythme actif à chaque battement est celui du dernier marqueur de rythme qui le précède. Un battement est étiqueté positif si ce rythme est une fibrillation auriculaire ou un flutter auriculaire, ces deux arythmies partageant la même conséquence clinique en termes de risque thromboembolique. Enfin, les intervalles physiologiquement impossibles, inférieurs à \SI{0.3}{\second} ou supérieurs à \SI{2.0}{\second}, ont été écartés avec leur étiquette. Aucune correction de battement ectopique n'a été appliquée : ce choix, discuté au chapitre~\ref{ch:discussion}, préserve le signal tel qu'un dispositif portable le verrait.
 
 \subsection{Fenêtrage}
-La série \RR{} a été segmentée en fenêtres glissantes de longueur \(W\) battements. Chaque fenêtre a reçu l'étiquette du rythme majoritaire couvert par celle-ci (un seuil de pureté de 50~\% a été appliqué).
+La série \RR{} a été segmentée en fenêtres glissantes de \(W = 60\) battements avec un pas de 30, soit un recouvrement de 50~\%. À une fréquence cardiaque de 80~battements par minute, une telle fenêtre couvre environ \SI{45}{\second} de signal. Chaque fenêtre a reçu l'étiquette du rythme majoritaire couvert par celle-ci : elle est déclarée positive si au moins la moitié de ses battements sont en \FA{}.
 
-\subsection{Split patient-level}
-Tous les patients ont été assignés exclusivement à un sous-ensemble (entraînement, validation ou test) : aucune fuite inter-patient n'a été tolérée. Ce protocole, central pour l'honnêteté de l'évaluation, est illustré par l'algorithme~\ref{alg:meth:split}.
+Le choix de \(W = 60\) n'est pas arbitraire : l'étude d'ablation de la section~\ref{sec:res:cnnlstm} montre que le passage de 30 à 60~battements est, de loin, le facteur qui pèse le plus sur la performance — davantage que le détail de l'architecture. Chaque fenêtre a enfin été centrée et réduite indépendamment des autres (normalisation intra-fenêtre), ce qui rend le modèle insensible à la fréquence cardiaque moyenne du sujet et le force à s'appuyer sur la seule \emph{variabilité} du rythme.
+
+Le jeu résultant est décrit à la table~\ref{tab:meth:donnees}.
+
+\begin{table}[H]
+  \centering
+  \caption{Jeux de fenêtres obtenus après extraction, nettoyage et segmentation.}
+  \label{tab:meth:donnees}
+  \begin{tabular}{lcc}
+    \toprule
+    & \textbf{AFDB} & \textbf{LTAFDB} \\
+    \midrule
+    Patients retenus                    & 25      & 84 \\
+    Fenêtres de 60 battements           & 40\,613 & 299\,727 \\
+    Proportion de fenêtres en \FA{}     & 43,6~\% & 58,1~\% \\
+    Patients notables au sens du \(F_1\) & 23     & 62 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\noindent Les patients dits \keyword{notables} sont ceux dont l'enregistrement contient les deux classes. Deux patients d'AFDB sont intégralement en \FA{}, et 22~patients de LTAFDB sont soit intégralement en \FA{}, soit intégralement en rythme sinusal : pour eux, le \(F_1\) individuel n'est pas défini de façon informative, et ils sont donc exclus de la moyenne par patient. Cette exclusion est systématiquement signalée avec les résultats.
+
+\subsection{Découpage à l'échelle du patient}
+\label{sec:meth:split}
+Tous les patients ont été assignés exclusivement à un sous-ensemble : aucune fuite inter-patient n'a été tolérée, de sorte qu'un même patient ne peut jamais apparaître à la fois à l'apprentissage et au test. Concrètement, la validation croisée à \(K = 5\) plis a été réalisée avec la procédure \texttt{GroupKFold} de \texttt{scikit-learn}, l'identifiant d'enregistrement servant de variable de groupe. Son fonctionnement est le suivant :
+\begin{itemize}[leftmargin=*]
+  \item les patients sont triés par nombre de fenêtres décroissant, puis affectés successivement au pli le moins rempli ; le découpage est donc \emph{déterministe} et ne dépend d'aucune graine aléatoire ;
+  \item cette affectation équilibre le nombre de \emph{fenêtres} par pli, mais elle n'impose aucune stratification sur la prévalence de \FA{} : la charge de \FA{} peut donc varier d'un pli à l'autre, ce qui constitue une source de variabilité assumée et quantifiée au chapitre~\ref{ch:resultats} ;
+  \item à chaque itération, un pli sert d'ensemble de validation tandis que l'union des \(K-1\) plis restants constitue l'ensemble d'apprentissage ;
+  \item les prédictions de validation des \(K\) plis sont concaténées en un vecteur de scores \keyword{hors-pli} couvrant l'intégralité du jeu de données ; toutes les métriques rapportées sont calculées sur ce vecteur.
+\end{itemize}
+
+L'algorithme~\ref{alg:split} résume ce protocole. Le caractère non négociable de ce découpage est vérifié par un test unitaire du dépôt, qui échoue dès qu'un patient apparaît des deux côtés d'un pli. Ce découpage par patient, et non par fenêtre, constitue la garantie méthodologique la plus importante du présent travail : il fait disparaître la fuite d'information qui gonfle artificiellement les scores rapportés dans une partie de la littérature (cf. chapitre~\ref{ch:discussion}).
 
 \begin{algorithm}[H]
-  \caption{Validation croisée à l'échelle du patient}
-  \label{alg:meth:split}
-  \begin{algorithmic}[1]
-    \Require ensemble de patients $\mathcal{P}$, nombre de \textit{folds} $K$
-    \Ensure \textit{folds} de patients $(\mathcal{F}_1, \dots, \mathcal{F}_K)$ disjoints
-    \State Mélanger $\mathcal{P}$ avec graine fixée
-    \State Partitionner $\mathcal{P}$ en $K$ sous-ensembles équilibrés en prévalence FA
-    \For{$k = 1$ à $K$}
-      \State $\mathcal{F}_k^{\text{test}} \gets$ patients du \textit{fold} $k$
-      \State $\mathcal{F}_k^{\text{train}} \gets \mathcal{P} \setminus \mathcal{F}_k^{\text{test}}$
-    \EndFor
-    \State \Return $(\mathcal{F}_1, \dots, \mathcal{F}_K)$
-  \end{algorithmic}
+\caption{Validation croisée groupée par patient et calcul des scores hors-pli}
+\label{alg:split}
+\begin{algorithmic}[1]
+\Require fenêtres \(X\), étiquettes \(y\), identifiants patients \(g\), nombre de plis \(K\)
+\Ensure vecteur de scores hors-pli \(\hat{s}\) aligné sur \(y\)
+\State \(\hat{s} \gets\) vecteur de taille \(|y|\) initialisé à \(\varnothing\)
+\State partitionner l'ensemble des patients uniques de \(g\) en \(K\) groupes disjoints \(P_1, \dots, P_K\)
+\For{\(k = 1\) à \(K\)}
+  \State \(V_k \gets \{\, i : g_i \in P_k \,\}\) \Comment{indices de validation}
+  \State \(T_k \gets \{\, i : g_i \notin P_k \,\}\) \Comment{indices d'apprentissage}
+  \State vérifier que \(\{g_i : i \in T_k\} \cap \{g_i : i \in V_k\} = \emptyset\)
+  \State \(\mu, \sigma \gets\) moyenne et écart-type de chaque fenêtre \Comment{normalisation intra-fenêtre}
+  \State \(w \gets |\{i \in T_k : y_i = 0\}| \,/\, |\{i \in T_k : y_i = 1\}|\) \Comment{pondération de la classe positive}
+  \State entraîner un modèle sur \((X_{T_k}, y_{T_k})\) avec la perte \(\mathrm{BCE}\) pondérée par \(w\)
+  \State \(\hat{s}_{V_k} \gets\) probabilités prédites sur \(X_{V_k}\)
+\EndFor
+\State \Return \(\hat{s}\)
+\end{algorithmic}
 \end{algorithm}
 
 % --- 3.3 Modèles -----------------------------------------------------
@@ -59,29 +117,76 @@ Tous les patients ont été assignés exclusivement à un sous-ensemble (entraî
 \label{sec:meth:modeles}
 
 \subsection{Baselines}
-Quatre méthodes de référence ont été implémentées :
+Cinq méthodes de référence ont été implémentées et évaluées sous le même découpage patient que le modèle proposé :
 \begin{itemize}
-  \item \textbf{Règle métier} fondée sur le coefficient de variation des \RR{} ;
-  \item \textbf{Forêt aléatoire} sur descripteurs statistiques ;
-  \item \textbf{Gradient boosting} (XGBoost) sur les mêmes descripteurs ;
-  \item \textbf{\CNN{} 1D} appliqué directement à la série \RR{}.
+  \item \textbf{Règle métier} fondée sur le coefficient de variation des \RR{}, dont le seuil est choisi par optimisation du \(F_1\) sur chaque pli d'entraînement ;
+  \item \textbf{Forêt aléatoire} sur descripteurs \keyword{HRV} (RMSSD, SDNN, pNN50, entropie de Shannon, coefficient de variation, statistiques des \RR{}) ;
+  \item \textbf{Gradient boosting} (implémentation par histogrammes) sur les mêmes descripteurs HRV ;
+  \item \textbf{\CNN{} 1D seul} appliqué directement à la série \RR{} ;
+  \item \textbf{\LSTM{} seul} appliqué directement à la série \RR{}.
 \end{itemize}
+Les deux derniers servent également de variantes d'ablation : ils isolent l'apport respectif des composantes convolutionnelle et récurrente du modèle hybride.
 
 \subsection{Modèle proposé : \CNN--\LSTM{}}
 Le modèle final combine un encodeur convolutionnel 1D et une couche récurrente \LSTM{} bidirectionnelle. Son architecture est décrite à la figure~\ref{fig:meth:archi}.
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.85\linewidth][7cm]{Schéma de l'architecture CNN-LSTM (encodeur conv \(\rightarrow\) BiLSTM \(\rightarrow\) tête dense)}
-  \caption{Architecture du modèle hybride \CNN--\LSTM{} proposé.}
+  \begin{tikzpicture}[
+      node distance=4.5mm,
+      layer/.style={rectangle, rounded corners, draw, align=center,
+                    minimum width=6.2cm, minimum height=0.8cm, font=\small},
+      arr/.style={-{Stealth[length=2.2mm]}, line width=0.6pt}]
+    \node[layer, fill=gray!12] (in) {Entrée : séquence d'intervalles \RR{} (\(W \times 1\))};
+    \node[layer, fill=blue!12, below=of in] (c1) {Convolution 1D + ReLU};
+    \node[layer, fill=blue!12, below=of c1] (c2) {Convolution 1D + ReLU + \textit{max-pooling}};
+    \node[layer, fill=green!14, below=of c2] (lstm) {\LSTM{} bidirectionnelle};
+    \node[layer, fill=orange!16, below=of lstm] (fc) {Couche dense + ReLU + \textit{dropout}};
+    \node[layer, fill=red!14, below=of fc] (out) {Sigmoïde \(\rightarrow\) \(P(\mathrm{FA}) \in [0,1]\)};
+    \draw[arr] (in) -- (c1);
+    \draw[arr] (c1) -- (c2);
+    \draw[arr] (c2) -- (lstm);
+    \draw[arr] (lstm) -- (fc);
+    \draw[arr] (fc) -- (out);
+  \end{tikzpicture}
+  \caption{Architecture du modèle hybride \CNN--\LSTM{} proposé : un encodeur convolutionnel extrait des motifs locaux du tachogramme, une couche récurrente bidirectionnelle en capture la dynamique temporelle, et une tête dense produit la probabilité de \FA{}.}
   \label{fig:meth:archi}
 \end{figure}
 
+\subsection{Procédure d'entraînement}
+\label{sec:meth:entrainement}
+Tous les modèles neuronaux ont été entraînés selon le même protocole, résumé à la table~\ref{tab:meth:entrainement}. Deux points méritent d'être explicités.
+
+D'une part, la fonction de coût est une entropie croisée binaire dont la classe positive est \textbf{pondérée} par le rapport entre le nombre de fenêtres négatives et positives de l'ensemble d'apprentissage, ce rapport étant recalculé à chaque pli. Cette pondération compense le déséquilibre des classes et privilégie la sensibilité, conformément à la priorité clinique énoncée plus haut. Elle a toutefois une conséquence dont le chapitre~\ref{ch:resultats} tirera parti : elle décale les probabilités prédites vers le haut, ce qui rend le seuil de 0,5 non optimal.
+
+D'autre part, l'arrêt anticipé surveille la perte de validation du pli courant et conserve les prédictions de la meilleure époque. Aucun ensemble de test distinct n'est prélevé à l'intérieur d'un pli : le pli de validation \emph{est} l'ensemble de test de ce pli, et les hyperparamètres ont été fixés lors d'une recherche préalable menée sur un nombre de plis différent (voir ci-dessous), ce qui limite le risque de sur-ajustement au protocole d'évaluation.
+
+\begin{table}[H]
+  \centering
+  \caption{Protocole d'entraînement commun à tous les modèles neuronaux.}
+  \label{tab:meth:entrainement}
+  \begin{tabular}{ll}
+    \toprule
+    Optimiseur                  & AdamW \\
+    Taille de lot               & 512 \\
+    Époques maximales           & 12 \\
+    Arrêt anticipé              & perte de validation, patience de 3 époques \\
+    Fonction de coût            & entropie croisée binaire pondérée \\
+    Pondération de la classe positive & \(|\text{négatifs}| / |\text{positifs}|\), par pli \\
+    Normalisation des entrées   & centrage-réduction intra-fenêtre \\
+    Graine aléatoire            & 42 (décalée de l'indice du pli) \\
+    Matériel                    & CPU, 4 fils d'exécution \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \subsection{Recherche d'hyperparamètres}
-Les hyperparamètres ont été optimisés à l'aide de la bibliothèque \texttt{Optuna} \cite{akiba2019optuna}. La fonction objectif a été définie comme le \(F_1\) moyenné sur les \textit{folds} de validation.
+Les hyperparamètres ont été optimisés à l'aide de la bibliothèque \texttt{Optuna} \cite{akiba2019optuna}, qui met en {\oe}uvre une recherche bayésienne par estimateur de Parzen arborescent. La fonction objectif maximisée est le \(F_1\) \emph{moyen par patient}, calculé sur les scores hors-pli d'une validation croisée groupée à 3~plis — et non le \(F_1\) par fenêtre, afin que la recherche optimise directement le critère qui sert ensuite à juger le modèle.
+
+Deux recherches successives ont été conduites. La première (phase~3, 30~essais) portait sur des fenêtres de 30~battements et visait le meilleur score possible sous un budget d'environ \num{100000} paramètres. L'étude d'ablation ayant ensuite montré l'intérêt d'une fenêtre plus longue, une seconde recherche (phase~3.5, 25~essais) a été relancée directement à \(W = 60\), avec des plages resserrées vers les petites architectures et une pénalisation \(L_2\) ajoutée à l'espace de recherche, dans le but explicite de réduire l'empreinte mémoire. Les deux espaces de recherche et les configurations retenues sont détaillés à l'annexe~\ref{ann:hyperparams}.
 
 \subsection{Compression}
-Quatre techniques ont été combinées : pruning structuré, quantification dynamique PyTorch, quantification statique INT8 et export ONNX. Les variantes étudiées sont synthétisées à la table~\ref{tab:meth:compression}.
+Trois familles de techniques ont été combinées : le \keyword{pruning} par magnitude (non structuré, global), la \keyword{quantification} entière INT8 dynamique (couches \texttt{Linear} et \texttt{LSTM}) et l'export \keyword{ONNX}. Les variantes étudiées sont synthétisées à la table~\ref{tab:meth:compression}.
 
 \begin{table}[H]
   \centering
@@ -91,17 +196,36 @@ Quatre techniques ont été combinées : pruning structuré, quantification dyna
     \toprule
     \textbf{Variante} & \textbf{Technique} & \textbf{Cible} \\
     \midrule
-    V0 & Modèle de référence FP32 & Référence \\
-    V1 & Pruning structuré 30~\% & Sparsité \\
-    V2 & Pruning + fine-tune & Récupération performance \\
-    V3 & Quantification dynamique & Inférence CPU \\
-    V4 & Quantification statique INT8 & Empreinte mémoire \\
-    V5 & Export ONNX FP32 & Portabilité \\
-    V6 & ONNX + quantification & Embarqué \\
-    V7 & Combinaison pruning + INT8 & Taille minimale \\
+    Référence FP32              & Modèle non compressé              & Référence \\
+    Pruning 30 / 50 / 70~\%     & Magnitude, non structuré, global  & Sparsité \\
+    Pruning 70~\% + fine-tune   & Pruning + ré-entraînement court   & Récupération de performance \\
+    Quant. INT8 dynamique       & Quantification \texttt{Linear}+\texttt{LSTM} & Empreinte mémoire \\
+    Pruning 50~\% + INT8        & Combinaison pruning + quant.      & Taille minimale \\
+    Export ONNX FP32            & Export portable + \textit{runtime} & Latence / portabilité \\
     \bottomrule
   \end{tabular}
 \end{table}
+
+Le protocole de mesure, décrit par l'algorithme~\ref{alg:compression}, appelle une précision importante : chaque variante est ré-évaluée en \emph{hors-pli complet}, c'est-à-dire que la compression est appliquée aux cinq modèles de plis et que chacun est réévalué sur son propre pli de validation. Comparer une variante compressée à la référence FP32 sur les mêmes fenêtres exactement est la seule façon d'attribuer une différence de performance à la compression et non au découpage.
+
+\begin{algorithm}[H]
+\caption{Évaluation d'une variante de compression}
+\label{alg:compression}
+\begin{algorithmic}[1]
+\Require poids des \(K\) plis \(\theta_1, \dots, \theta_K\), recette de compression \(\mathcal{C}\)
+\Ensure \(F_1\) par patient, taille et latence de la variante
+\State \(\hat{s} \gets\) vecteur de scores hors-pli vide
+\For{\(k = 1\) à \(K\)}
+  \State \(m \gets\) modèle initialisé avec \(\theta_k\)
+  \State \(m' \gets \mathcal{C}(m)\) \Comment{élagage, quantification, ou les deux}
+  \State \(\hat{s}_{V_k} \gets m'(X_{V_k})\) \Comment{réévaluation sur le pli de validation de \(k\)}
+  \State mesurer la taille de \(m'\) sérialisé et sa latence sur une fenêtre unique
+\EndFor
+\State \Return métriques calculées sur \(\hat{s}\), taille et latence moyennées sur les \(K\) plis
+\end{algorithmic}
+\end{algorithm}
+
+Trois pièges rencontrés lors de cette étude méritent d'être signalés, car ils invalident silencieusement les mesures. Premièrement, l'élagage seul ne réduit pas la taille du fichier : mettre des poids à zéro ne les supprime pas du tenseur, et seul un format creux ou une quantification apporte un gain réel. Deuxièmement, le masque d'élagage doit rester attaché pendant le ré-entraînement qui suit, faute de quoi les poids annulés se réactivent et la parcimonie disparaît. Troisièmement, l'export ONNX peut écrire les poids dans un fichier annexe, ce qui fait paraître le modèle exporté artificiellement petit si l'on ne mesure que le fichier principal.
 
 % --- 3.4 Critères d'évaluation -- IMPORTANT : intégrer le PDF Critères --
 \section{Critères d'évaluation}
@@ -167,13 +291,48 @@ Dans le contexte de la détection de la \FA{}, la minimisation des \FN{} est pri
 
 L'exactitude (équation~\ref{eq:meth:accuracy}) perd de sa pertinence en présence de classes déséquilibrées. Dans ce travail, où la prévalence de la \FA{} est inférieure à 50~\%, le score \(F_1\) (équation~\ref{eq:meth:f1}) a été préféré comme critère principal.
 
+\subsection{\texorpdfstring{Le \(F_1\) par patient}{Le F1 par patient} : critère principal}
+\label{sec:meth:f1patient}
+Les métriques précédentes se calculent sur l'ensemble des fenêtres confondues. Or une telle moyenne est dominée par les patients qui contribuent le plus de fenêtres, et elle masque les sujets sur lesquels le modèle échoue. Le critère principal retenu dans ce mémoire est donc le \(F_1\) \emph{moyen par patient} :
+
+\begin{equation}
+  F_1^{\text{patient}} = \frac{1}{|\mathcal{P}^{*}|} \sum_{p \in \mathcal{P}^{*}} F_1\!\left(y^{(p)}, \hat{y}^{(p)}\right)
+  \label{eq:meth:f1patient}
+\end{equation}
+
+\noindent où \(\mathcal{P}^{*}\) désigne l'ensemble des patients notables, c'est-à-dire ceux dont l'enregistrement contient à la fois des fenêtres en \FA{} et des fenêtres en rythme sinusal. Chaque patient pèse ainsi le même poids, quelle que soit la durée de son enregistrement. Ce choix rend la métrique nettement plus sévère, et c'est précisément son intérêt : il révèle la dispersion des performances entre sujets, que le \(F_1\) par fenêtre dissimule.
+
+\subsection{Quantification de l'incertitude}
+\label{sec:meth:incertitude}
+Avec seulement 23~patients notables sur AFDB, une différence de quelques points entre deux méthodes peut n'être que du bruit d'échantillonnage. Trois précautions ont donc été prises.
+
+\textbf{Écart-type entre plis.} Le \(F_1\) par patient est également recalculé pli par pli, et son écart-type est rapporté. Il mesure la sensibilité du résultat au découpage.
+
+\textbf{Intervalle de confiance par bootstrap.} L'unité statistique pertinente étant le patient — les fenêtres d'un même sujet ne sont pas indépendantes —, les \emph{patients} sont ré-échantillonnés avec remise (\num{2000} tirages) et l'intervalle de confiance à 95~\% est lu comme l'intervalle percentile de la distribution des moyennes obtenues.
+
+\textbf{Comparaison appariée.} Comparer deux méthodes par le chevauchement de leurs intervalles de confiance est excessivement conservateur, car les deux méthodes sont évaluées \emph{sur les mêmes patients}. La comparaison est donc menée sur la \emph{différence} de \(F_1\) patient par patient, dont on borne la moyenne par le même bootstrap. Cette procédure appariée est nettement plus puissante et constitue la base des conclusions comparatives du chapitre~\ref{ch:resultats}.
+
 \subsection{Courbe ROC et aire sous la courbe (AUC)}
 La courbe ROC trace la sensibilité en fonction du complément à 1 de la spécificité, paramétrée par le seuil de décision. L'aire sous la courbe (\AUROC{}) constitue une métrique de séparabilité indépendante du seuil.
 
 \begin{figure}[H]
   \centering
-  \figplaceholder[0.7\linewidth][6cm]{Courbe ROC type avec AUC = 0,90 — diagonale = classifieur aléatoire}
-  \caption{Exemple de courbe ROC. Plus l'aire sous la courbe est proche de 1, meilleur est le classifieur.}
+  \begin{tikzpicture}[scale=4.2, line width=0.7pt, font=\small]
+    % axes
+    \draw[-{Stealth[length=2mm]}] (0,0) -- (1.1,0) node[right, font=\scriptsize] {\(1-\text{Spécificité}\)};
+    \draw[-{Stealth[length=2mm]}] (0,0) -- (0,1.1) node[above, font=\scriptsize] {Sensibilité};
+    % graduations
+    \foreach \t in {0.5,1.0}{
+      \draw (\t,0) -- (\t,-0.02) node[below, font=\scriptsize] {\t};
+      \draw (0,\t) -- (-0.02,\t) node[left, font=\scriptsize] {\t};
+    }
+    % diagonale = classifieur aléatoire
+    \draw[dashed, gray] (0,0) -- (1,1) node[pos=0.55, sloped, above, font=\scriptsize] {aléatoire};
+    % courbe ROC concave
+    \draw[blue, line width=1pt] (0,0) .. controls (0.04,0.55) and (0.25,0.94) .. (1,1);
+    \node[blue] at (0.62,0.45) {AUC \(\approx 0{,}90\)};
+  \end{tikzpicture}
+  \caption{Exemple de courbe ROC. Plus l'aire sous la courbe (\AUROC{}) est proche de 1, meilleur est le classifieur ; la diagonale correspond à un classifieur aléatoire.}
   \label{fig:meth:roc}
 \end{figure}
 
@@ -195,9 +354,16 @@ Les expériences ont été menées en Python~3.11 avec PyTorch~2.x, scikit-learn
     Système d'exploitation & Linux 6.8 \\
     Langage                & Python 3.11 \\
     Frameworks             & PyTorch 2.x, scikit-learn, Optuna, ONNX Runtime \\
-    GPU                    & [À PRÉCISER] \\
-    CPU                    & [À PRÉCISER] \\
-    Suivi d'expériences    & Optuna SQLite \\
+    Accès aux signaux      & \texttt{wfdb} (PhysioNet) \\
+    Application interactive & Streamlit, Plotly \\
+    GPU                    & NVIDIA GeForce RTX 3050 Laptop (6 Go) \\
+    CPU                    & Intel Core i7-13650HX (14 cœurs / 20 threads) \\
+    Suivi d'expériences    & Optuna (base SQLite) \\
+    Développement          & Visual Studio Code, Git \\
     \bottomrule
   \end{tabular}
 \end{table}
+
+\section{Conclusion}
+\label{sec:meth:conclusion}
+En résumé, ce chapitre a fixé l'ensemble du cadre expérimental : un pipeline reproductible fondé sur les seuls intervalles \RR{}, un protocole d'évaluation à l'échelle du patient, le réseau \CNN--\LSTM{} proposé et ses variantes compressées, ainsi que les métriques retenues. Les résultats obtenus selon cette méthodologie sont rapportés au chapitre~\ref{ch:resultats}.

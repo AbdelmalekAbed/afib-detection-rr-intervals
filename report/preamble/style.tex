@@ -6,6 +6,9 @@
 \onehalfspacing
 
 % ----- En-tête / pied de page ----------------------------------------
+% Hauteur d'en-tête suffisante pour le texte 12 pt (évite les avertissements
+% « \headheight is too small » de fancyhdr).
+\setlength{\headheight}{15pt}
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\nouppercase{\leftmark}}
@@ -22,10 +25,11 @@
 
 % ----- Mise en forme des titres de chapitre --------------------------
 \usepackage{titlesec}
-\titleformat{\chapter}[display]
-  {\normalfont\Large\bfseries}
-  {\chaptertitlename\ \thechapter}{14pt}{\LARGE}
-\titlespacing*{\chapter}{0pt}{0pt}{20pt}
+% « Chapitre N : Titre » sur une seule ligne (format hang, et non display)
+\titleformat{\chapter}[hang]
+  {\normalfont\LARGE\bfseries}
+  {\chaptertitlename\ \thechapter\,:}{0.5em}{}
+\titlespacing*{\chapter}{0pt}{0pt}{24pt}
 
 \titleformat{\section}{\normalfont\large\bfseries}{\thesection}{1em}{}
 \titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{1em}{}

@@ -6,8 +6,9 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-CPU-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-Phase%207%20%E2%80%94%20Report-yellow.svg)]()
+[![Tests](https://img.shields.io/badge/tests-29%20passing-brightgreen.svg)]()
 [![Streamlit](https://img.shields.io/badge/Streamlit-AFib%20Sandbox-FF4B4B?logo=streamlit)](app/README.md)
-[![Report](https://img.shields.io/badge/Report-LaTeX%20scaffold-008080?logo=overleaf)](report/README.md)
+[![Report](https://img.shields.io/badge/Report-63%20pages-008080?logo=overleaf)](report/README.md)
 
 ## Live Demo
 
@@ -21,13 +22,13 @@ real patient timelines, swap compression variants live, and sketch RR series by 
 ## Rapport (mémoire)
 
 Le mémoire est rédigé en **LaTeX** (plan IMRAD strict, directives Sayadi : 12 pt
-Times-like, interligne 1,5, marges 25 mm). Le squelette complet — 6 chapitres,
-biblio IEEE, page de garde, résumé FR + abstract EN — est prêt à compiler sur
-Overleaf.
+Times-like, interligne 1,5, marges 25 mm) : **63 pages**, 6 chapitres, 20 figures,
+2 algorithmes en pseudo-code, 22 références au format IEEE, résumé FR + abstract EN.
+Il compile sans aucun avertissement.
 
-- Source LaTeX : [`report/`](report/)
-- Guide de compilation + checklist des placeholders à remplir : [`report/README.md`](report/README.md)
-- 28 figures déjà wrappées en PDF par [`scripts/png_to_pdf.py`](scripts/png_to_pdf.py)
+- Source LaTeX : [`report/`](report/) — `make report-pdf`
+- Guide de compilation et état du document : [`report/README.md`](report/README.md)
+- 32 figures disponibles dans [`report/figures/`](report/figures/)
 
 ---
 
@@ -44,7 +45,7 @@ La fibrillation auriculaire (AFib) est l'arythmie cardiaque la plus fréquente e
 | Dataset | Rôle | Fiche |
 |---|---|---|
 | [MIT-BIH AFib DB](https://physionet.org/content/afdb/) | Entraînement + validation principale | [`docs/datasets/afdb.md`](docs/datasets/afdb.md) |
-| [MIT-BIH NSR DB](https://physionet.org/content/nsrdb/) | Exemples négatifs supplémentaires | [`docs/datasets/nsrdb.md`](docs/datasets/nsrdb.md) |
+| [MIT-BIH NSR DB](https://physionet.org/content/nsrdb/) | Exploration phase 1 uniquement — **non utilisée** par les expériences rapportées (voir `configs/data.yaml`) | [`docs/datasets/nsrdb.md`](docs/datasets/nsrdb.md) |
 | [Long-Term AFib DB](https://physionet.org/content/ltafdb/) | Évaluation externe (généralisation) | [`docs/datasets/ltafdb.md`](docs/datasets/ltafdb.md) |
 
 Tous les datasets sont libres et téléchargés automatiquement via la commande `make data`. Pour la motivation de chaque dataset et les pièges méthodologiques associés, voir [`docs/datasets/README.md`](docs/datasets/README.md).
@@ -93,12 +94,13 @@ sous cet environnement.
 | Phase | Sujet | Notebook |
 |---|---|---|
 | 1 | EDA — distributions RR, Poincaré, déséquilibre par patient | [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb) |
-| 2 | Baselines HRV + RF, LR, MLP, XGBoost sous CV patient-level partagée | [`notebooks/02_baselines.ipynb`](notebooks/02_baselines.ipynb) |
+| 2 | Baselines (règle métier, HRV+RF, HRV+gradient boosting, CNN seul, LSTM seul) sous CV patient-level partagée | [`notebooks/02_baselines.ipynb`](notebooks/02_baselines.ipynb) |
 | 3 | CNN-LSTM + Optuna (archi ~100k params), ablation, courbes d'apprentissage | [`notebooks/03_ablation.ipynb`](notebooks/03_ablation.ipynb) |
 | 3.5 | Régularisation focalisée fenêtre w=60 (archi ~30k params) | [`notebooks/04_phase35_w60.ipynb`](notebooks/04_phase35_w60.ipynb) |
 | 4 / 4b | Compression — quantization, pruning, ONNX (archi 100k puis 30k → 87 KB INT8) | [`notebooks/05_phase4_compression.ipynb`](notebooks/05_phase4_compression.ipynb) |
 | 5 | Robustesse cross-dataset AFDB → LTAFDB (zero-shot, scratch, fine-tune) | [`notebooks/06_phase5_cross_dataset.ipynb`](notebooks/06_phase5_cross_dataset.ipynb) |
 | 6 | Démo interactive Streamlit (AFib Sandbox, 5 pages) | [`app/README.md`](app/README.md) |
+| 6 bis | Analyses statistiques — IC bootstrap, sensibilité au seuil, F1 vs charge de FA | [`scripts/phase6_analysis.py`](scripts/phase6_analysis.py) |
 | 7 | Rapport LaTeX (IMRAD strict, conforme directives Sayadi) | [`report/README.md`](report/README.md) |
 
 ## Structure du repo
@@ -115,9 +117,10 @@ afib-cnn-lstm/
 ├── configs/             # YAML (data, modèle, training)
 ├── notebooks/           # EDA, ablation, compression
 ├── app/streamlit_app.py # démo
-├── tests/               # tests unitaires (pipeline de données critique)
-├── reports/             # figures et rapport final
-└── scripts/             # scripts utilitaires (téléchargement, prétraitement)
+├── tests/               # 29 tests unitaires (découpage patient, étiquetage RR, métriques)
+├── reports/             # résultats JSON/CSV, scores hors-pli, figures
+├── report/              # source LaTeX du mémoire
+└── scripts/             # téléchargement, phases 2 à 6, recherche Optuna
 ```
 
 ## État d'avancement
@@ -126,41 +129,67 @@ Projet structuré en 7 phases sur 16 semaines.
 
 - [x] Phase 0 — Cadrage & setup
 - [x] Phase 1 — Pipeline de données & EDA
-- [x] Phase 2 — Baselines (4 modèles sous CV patient-level partagée)
+- [x] Phase 2 — Baselines (5 méthodes sous CV patient-level partagée)
 - [x] Phase 3 — CNN-LSTM & optimisation Optuna (+ Phase 3.5 : régularisation focalisée w=60)
 - [x] Phase 4 — Compression (quantization, pruning, ONNX) sur archi Phase 3
 - [x] Phase 4b — Compression sur archi Phase 3.5 (~30k params) — atteint la cible <200 KB
 - [x] Phase 5 — Robustesse cross-dataset (AFDB → LTAFDB)
 - [x] Phase 6 — Démo Streamlit (AFib Sandbox, 5 pages interactives Plotly)
+- [x] Phase 6 bis — Analyses statistiques (IC bootstrap, seuil, charge de FA)
 - [~] Phase 7 — Rapport + polish (en cours)
-  - [x] Squelette LaTeX (6 chapitres IMRAD, biblio IEEE, page de garde, résumé FR + abstract EN) — voir [`report/`](report/)
-  - [x] 28 figures wrappées en PDF pour `\includegraphics` — voir [`scripts/png_to_pdf.py`](scripts/png_to_pdf.py)
-  - [x] Polish repo (`app/README.md`, badges, audits docs)
+  - [x] Mémoire LaTeX complet (63 pages, 6 chapitres IMRAD, 22 références IEEE)
+  - [x] Compilation propre : 0 avertissement, 0 référence non résolue
+  - [x] 20 figures insérées + 2 algorithmes en pseudo-code
+  - [x] Tous les chiffres du mémoire vérifiés contre les JSON de `reports/`
+  - [x] `src/train.py` et `src/evaluate.py` réellement implémentés
+  - [x] `scripts/optuna_search.py` — recherche rejouable hors notebook
+  - [x] 29 tests unitaires (dont l'étiquetage RR, non couvert auparavant)
+  - [ ] Membres du jury à renseigner sur la page de garde
   - [ ] Déploiement Streamlit Cloud (URL publique)
-  - [ ] Captures d'écran sandbox (`docs/img/sandbox_page{1..5}.png`)
-  - [ ] Ré-export vectoriel des figures via utilitaire `save_fig` (notebooks)
-  - [ ] Page de garde + remerciements à personnaliser (école, encadrants, jury)
-  - [ ] Compléter les valeurs `[XX]` des tables résultats
+  - [ ] Ré-export vectoriel des 28 figures issues des notebooks
 
 ## Résultats clés
 
-Synthèse — les valeurs détaillées figurent dans les notebooks correspondants et
-seront consolidées dans le rapport LaTeX ([`report/chapters/04_resultats.tex`](report/chapters/04_resultats.tex)).
+Toutes les valeurs ci-dessous sont extraites des fichiers JSON versionnés dans
+[`reports/`](reports/) — jamais recopiées à la main. Évaluation en validation
+croisée 5 plis groupée par patient sur AFDB, fenêtre de 60 battements,
+seuil de décision 0,5.
 
-| Modèle | F1 (patient) | Taille | Notes |
-|---|---|---|---|
-| HRV + Random Forest (baseline)     | ~0.70 | — | feature engineering classique |
-| HRV + XGBoost (baseline)           | ~0.72 | — | meilleure baseline |
-| CNN-LSTM (Phase 3, ~100k params)   | ~0.72 | 400+ KB FP32 | plafond F1/patient observé |
-| **CNN-LSTM (Phase 3.5, ~30k params)** | ~0.72 | 120 KB FP32 | même F1, 3× plus compact |
-| CNN-LSTM Phase 3.5 + INT8 (Phase 4b) | ~0.68 | **87 KB** | cible <200 KB atteinte |
-| CNN-LSTM Phase 3.5 → LTAFDB (zero-shot, Phase 5) | ~0.70 | 87 KB | robustesse cross-dataset |
+| Modèle | F1 **patient** | F1 fenêtre | AUROC | Taille | Source |
+|---|---|---|---|---|---|
+| Règle métier (coefficient de variation) | 0.635 | 0.814 | 0.906 | — | `phase2_baselines_w60.json` |
+| HRV + Random Forest                     | 0.850 | 0.933 | 0.988 | — | `phase2_baselines_w60.json` |
+| **HRV + Gradient boosting**             | **0.883** | 0.953 | 0.992 | — | `phase2_baselines_w60.json` |
+| CNN 1D seul                             | 0.653 | 0.853 | 0.930 | — | `phase2_baselines_w60.json` |
+| LSTM seul                               | 0.631 | 0.811 | 0.922 | — | `phase2_baselines_w60.json` |
+| CNN-LSTM (Phase 3, 100 k params)        | 0.717 | 0.894 | 0.971 | 403 KB | `phase4_results.json` |
+| CNN-LSTM (Phase 3.5, 30 k params)       | 0.680 | 0.881 | 0.959 | 133 KB | `phase4b_results.json` |
+| CNN-LSTM 30 k + INT8 (Phase 4b)         | 0.680 | 0.881 | 0.959 | **87 KB** | `phase4b_results.json` |
+| CNN-LSTM 30 k → LTAFDB zero-shot (Ph. 5) | 0.713 | 0.945 | 0.970 | 87 KB | `phase5_results.json` |
 
-**Lecture clé :** le plafond F1/patient ≈ 0.72 observé sur AFDB est confirmé
-indépendamment par LTAFDB en cross-dataset. Il s'agit d'une limite intrinsèque
-de l'information portée par les seuls intervalles RR ; les chiffres ≥ 0.95 de la
-littérature reposent typiquement sur une évaluation par fenêtre (avec fuite
-inter-patients), et non patient-level.
+**Trois lectures à retenir.**
+
+1. **Les descripteurs HRV battent le deep learning.** Sous évaluation par
+   patient, le gradient boosting sur 8 descripteurs HRV classiques atteint 0.883
+   contre 0.717 pour le meilleur CNN-LSTM. Sur 23 patients notés, des
+   descripteurs conçus depuis vingt ans pour la FA encapsulent une connaissance
+   a priori que le réseau doit réapprendre à partir de très peu de sujets.
+
+2. **L'écart avec la littérature est un artefact de protocole.** Les mêmes
+   modèles mesurés *par fenêtre* donnent 0.953 (GB) et 0.894 (CNN-LSTM), soit
+   exactement l'ordre de grandeur des articles publiés. C'est l'agrégation par
+   patient qui fait chuter le score, pas l'architecture.
+
+3. **Le « plafond » est porté par une poignée de patients.** Les 8 patients dont
+   moins de 10 % de l'enregistrement est en FA ont un F1 moyen de 0.36 ; les 15
+   autres atteignent 0.85. Quelques faux positifs suffisent à effondrer la
+   précision quand la classe positive est rare. Analyse détaillée :
+   [`scripts/phase6_analysis.py`](scripts/phase6_analysis.py).
+
+L'intérêt du modèle profond se situe donc ailleurs que dans le F1 brut :
+traitement de bout en bout sans extraction manuelle de descripteurs, 87 KB après
+quantification INT8 sans aucune perte, et F1 patient préservé en transfert
+zero-shot vers LTAFDB.
 
 ## Disclaimer médical
 

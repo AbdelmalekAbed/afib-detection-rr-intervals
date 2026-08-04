@@ -1,32 +1,36 @@
+# Configuration d'entraînement du CNN-LSTM.
+# Ces valeurs sont celles réellement utilisées par les phases 3.5 / 4b / 5 et
+# consommées par `python -m src.train --config configs/train.yaml`.
 defaults:
   data: configs/data.yaml
   model: configs/model_cnn_lstm.yaml
 
 training:
   seed: 42
-  epochs: 20
-  batch_size: 256
+  epochs: 12
+  batch_size: 512
   optimizer:
     name: adamw
-    lr: 1.0e-3
-    weight_decay: 1.0e-4
-  scheduler:
-    name: cosine
-    warmup_epochs: 1
+    lr: 1.649184589567592e-3      # issu de la recherche Optuna (phase 3.5)
+    weight_decay: 1.5862776574507062e-3
   loss:
     name: bce_with_logits
-    class_weighted: true
+    # Pondération de la classe positive par le ratio négatifs/positifs du pli
+    # d'entraînement, recalculée à chaque pli.
+    pos_weight: auto
   early_stopping:
-    monitor: val_f1
-    patience: 5
-    mode: max
+    monitor: val_loss
+    patience: 3
+    mode: min
 
 evaluation:
-  threshold_search: true
+  # Seuil fixe : toutes les métriques du mémoire sont calculées à 0,5.
+  # L'effet de ce choix est quantifié par scripts/phase6_analysis.py.
+  decision_threshold: 0.5
   metrics: [f1, auroc, auprc, sensitivity, specificity, accuracy]
   per_patient_report: true
 
 logging:
   out_dir: artifacts
-  experiment_name: cnn_lstm_baseline
+  experiment_name: cnn_lstm_phase35
   save_best_only: true

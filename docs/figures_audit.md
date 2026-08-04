@@ -3,14 +3,17 @@
 > Snapshot of every committed PNG in `reports/figures/` with its current resolution
 > and a recommended action for the thesis report.
 >
-> **Status 2026-05-28 (updated):** the wrap path was chosen. Every PNG has been
-> embedded into a same-name `.pdf` in `report/figures/` via
-> `scripts/png_to_pdf.py` (Pillow, lossless, declared 300 dpi resolution).
-> The LaTeX memoir now `\includegraphics{...pdf}` directly; the six clearest
-> matches are already wired in `report/chapters/04_resultats.tex`. The
-> remaining 22 PDFs are available for the user to insert as needed. A future
-> notebook re-run with a `save_fig` utility would replace these raster-wrapped
-> PDFs with true vector PDFs, but is not blocking the report.
+> **Mise à jour 2026-08-04.** Deux voies coexistent désormais.
+>
+> - Les 28 figures issues des notebooks (phases 1 à 5) sont des PNG enveloppés
+>   sans perte dans un PDF de même nom par `scripts/png_to_pdf.py` (Pillow,
+>   300 dpi déclarés). Elles restent des images matricielles.
+> - Les 4 figures de la phase 6 (`19_` à `22_`) sont produites directement par
+>   `scripts/phase6_analysis.py`, qui écrit **à la fois** un PDF vectoriel pour
+>   LaTeX et un PNG 300 dpi pour le README et l'application. C'est le motif à
+>   généraliser lors d'une future ré-exécution des notebooks.
+>
+> Le mémoire insère aujourd'hui 20 figures. Les autres restent disponibles.
 
 ## Re-export pattern (matplotlib)
 

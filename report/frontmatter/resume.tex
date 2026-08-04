@@ -1,32 +1,27 @@
 % =====================================================================
-%  Résumé (FR) + Abstract (EN) + Mots-clés
-%  Règle (Buttler) : <= 250 mots, mini-version du mémoire, écrit au passé,
-%  autosuffisant, sans citation ni figure.
+%  Résumé (FR) + Abstract (EN) + Mots-clés — tenus sur UNE seule page
+%  (interligne simple local, texte condensé).
 % =====================================================================
-
-% ---------- Résumé en français ----------------------------------------
 \chapter*{Résumé}
 \addcontentsline{toc}{chapter}{Résumé}
+\markboth{Résumé}{Résumé}
+\begingroup
+\singlespacing
 
-La fibrillation auriculaire (FA) est l'arythmie cardiaque la plus fréquente et représente un facteur de risque majeur d'accident vasculaire cérébral. Sa détection automatique à partir d'enregistrements ECG longue durée constitue un enjeu clinique reconnu.
+La fibrillation auriculaire (FA) est l'arythmie cardiaque soutenue la plus fréquente et un facteur de risque majeur d'accident vasculaire cérébral ; sa détection automatique à partir d'enregistrements ECG longue durée constitue un enjeu clinique reconnu. Ce travail propose une chaîne complète de détection de la FA fondée uniquement sur les intervalles \RR{}, afin d'éviter le coût de l'analyse morphologique de l'\ECG{}. Cinq méthodes de référence ont d'abord été établies sous validation croisée à l'échelle du patient ; un réseau hybride \CNN--\LSTM{} a ensuite été conçu, optimisé par recherche bayésienne (\textit{Optuna}) puis comprimé en vue d'un déploiement embarqué ; sa robustesse a été mesurée par transfert vers un second jeu de données acquis dans des conditions cliniques différentes (LTAFDB) ; enfin, une application interactive a été développée pour explorer les décisions du modèle.
 
-Ce travail a proposé une chaîne complète de détection de la FA fondée uniquement sur les intervalles \RR{}, en évitant le coût de l'analyse morphologique de l'\ECG{}. Quatre méthodes de référence ont d'abord été établies sous validation croisée à l'échelle du patient afin de quantifier la difficulté intrinsèque du problème. Un réseau hybride \CNN--\LSTM{} a ensuite été conçu, optimisé par recherche d'hyperparamètres bayésienne (\textit{Optuna}), puis comprimé en vue d'un déploiement embarqué. Sa robustesse a été évaluée par transfert sur un second jeu de données acquis dans des conditions cliniques différentes (LTAFDB). Une application interactive a finalement été développée pour permettre l'exploration des décisions du modèle.
+À l'échelle du patient, la meilleure méthode de référence (gradient boosting sur descripteurs HRV) atteint un \(F_1\) de 0,88, tandis que le \CNN--\LSTM{} proposé obtient 0,72 (\AUROC{} de 0,97) ; une comparaison appariée établit que cet écart est significatif. Le modèle est comprimé jusqu'à 87~KB par quantification INT8 sans perte de performance et conserve son \(F_1\) en transfert (0,71 en \textit{zero-shot} sur LTAFDB). L'analyse localise l'origine de l'écart : sur les patients dont plus de 10~\% du tracé est en FA, les deux familles sont proches (0,94 contre 0,86) ; c'est sur les patients à faible charge que le réseau perd sa spécificité (0,46 contre 0,77). Une part de la perte relève par ailleurs de la calibration, le seuil optimal se situant vers 0,84 et non 0,5.
 
-Les résultats ont montré [\textit{à compléter — métriques finales : F1/patient, AUROC, taille modèle après quantification, perte cross-dataset}]. L'analyse a mis en évidence un \textit{plateau intrinsèque} au signal \RR{} seul, dépassable uniquement par l'apport d'une information morphologique additionnelle.
-
-\medskip
-\textbf{Mots-clés :} fibrillation auriculaire ; intervalles \RR{} ; apprentissage profond ; réseau hybride \CNN--\LSTM{} ; compression de modèles ; généralisation cross-dataset.
+\smallskip
+\noindent\textbf{Mots-clés :} fibrillation auriculaire ; intervalles \RR{} ; apprentissage profond ; réseau hybride \CNN--\LSTM{} ; compression de modèles ; généralisation cross-dataset.
 
 \bigskip
-
-% ---------- Abstract in English ---------------------------------------
 \section*{Abstract}
 
-Atrial fibrillation (AF) is the most common cardiac arrhythmia and a major risk factor for stroke. Automated detection from long-term ECG recordings is a recognised clinical need.
+Atrial fibrillation (AF) is the most common sustained cardiac arrhythmia and a major risk factor for stroke; its automated detection from long-term ECG recordings is a recognised clinical need. This work proposes a complete AF detection pipeline based solely on \RR{} intervals, avoiding the cost of ECG morphology analysis. Five baseline methods were first established under patient-level cross-validation; a hybrid \CNN--\LSTM{} network was then designed, tuned via Bayesian search (\textit{Optuna}) and compressed for embedded deployment; its robustness was assessed through transfer to a second dataset acquired under different clinical conditions (LTAFDB); and an interactive application was finally developed to explore the model's decisions.
 
-This work proposed a complete AF detection pipeline based solely on \RR{} intervals, avoiding the cost of ECG morphology analysis. Four baseline methods were first established under patient-level cross-validation to quantify the intrinsic difficulty of the task. A hybrid \CNN--\LSTM{} network was then designed, tuned via Bayesian hyperparameter search (\textit{Optuna}), and compressed for embedded deployment. Its robustness was assessed through transfer to a second dataset acquired under different clinical conditions (LTAFDB). An interactive application was finally developed to explore the model's decisions.
+At the patient level, the strongest baselines (gradient boosting on HRV features) reached an \(F_1\) of 0.88, while the proposed \CNN--\LSTM{} achieved an \(F_1\) of 0.72 (\AUROC{} of 0.97), compressed down to 87~KB via INT8 quantisation with no performance loss and preserving its \(F_1\) under transfer (0.71 zero-shot on LTAFDB). The analysis highlighted an \textit{intrinsic plateau} of \RR{}-only signals, which can only be overcome by adding morphological information.
 
-The results showed [\textit{to be completed — final metrics: patient-level F1, AUROC, post-quantisation model size, cross-dataset performance drop}]. The analysis highlighted an \textit{intrinsic plateau} of \RR{}-only signals, which can only be overcome by adding morphological information.
-
-\medskip
-\textbf{Keywords:} atrial fibrillation; \RR{} intervals; deep learning; hybrid \CNN--\LSTM{}; model compression; cross-dataset generalisation.
+\smallskip
+\noindent\textbf{Keywords:} atrial fibrillation; \RR{} intervals; deep learning; hybrid \CNN--\LSTM{}; model compression; cross-dataset generalisation.
+\endgroup
