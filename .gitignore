@@ -47,6 +47,9 @@ optuna.db
 # Reports build (notebook artifacts)
 reports/build/
 
+# Sorties du notebook d'archive de la phase 1 — jamais celles du mémoire
+reports/figures_phase1_archive/
+
 # LaTeX intermediates (across the repo)
 *.aux
 *.log
