@@ -98,5 +98,11 @@ mlflow/
 instructions report/
 prototypes mémoire/
 
+# Preparation soutenance : fiches de revision et prompts personnels (usage local)
+docs/soutenance_explications.md
+docs/soutenance_explications_complet.md
+docs/prompt_presentation_soutenance.md
+docs/prompt_pptx_soutenance.md
+
 # Reglages locaux de session Claude Code
 .claude/settings.local.json
