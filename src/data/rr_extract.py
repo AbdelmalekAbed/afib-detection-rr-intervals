@@ -57,8 +57,8 @@ def _rhythm_per_position(
 def extract_rr_series(meta: RecordMetadata) -> RRSeries:
     """Build an :class:`RRSeries` from a :class:`RecordMetadata` bundle.
 
-    Beats come from ``meta.beat_ann`` (may be ``.qrs`` for AFDB or ``.atr`` for
-    NSRDB/LTAFDB). Rhythms always come from ``meta.rhythm_ann`` (``.atr``).
+    Beats come from ``meta.beat_ann`` (``.qrs`` for AFDB, ``.atr`` for LTAFDB).
+    Rhythms always come from ``meta.rhythm_ann`` (``.atr``).
     """
     beat_samples_all = np.asarray(meta.beat_ann.sample)
     beat_symbols = np.asarray(meta.beat_ann.symbol)

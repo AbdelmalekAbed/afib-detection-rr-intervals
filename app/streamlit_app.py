@@ -170,7 +170,7 @@ with st.expander("Reproduce all results from scratch"):
 git clone git@github.com:AbdelmalekAbed/afib-detection-rr-intervals.git
 cd afib-detection-rr-intervals
 make setup                            # uv venv + cpu pytorch + project install
-make data                             # download AFDB + LTAFDB + NSRDB from PhysioNet
+make data                             # download AFDB + LTAFDB from PhysioNet
 
 # Phase 4 + 5 reproduction
 python -m scripts.phase4_compression  # ~3 min CPU

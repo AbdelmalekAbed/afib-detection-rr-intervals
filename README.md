@@ -42,13 +42,12 @@ La fibrillation auriculaire (AFib) est l'arythmie cardiaque la plus fréquente e
 
 ## Datasets
 
-| Dataset | Rôle | Fiche |
-|---|---|---|
-| [MIT-BIH AFib DB](https://physionet.org/content/afdb/) | Entraînement + validation principale | [`docs/datasets/afdb.md`](docs/datasets/afdb.md) |
-| [MIT-BIH NSR DB](https://physionet.org/content/nsrdb/) | Exploration phase 1 uniquement — **non utilisée** par les expériences rapportées (voir `configs/data.yaml`) | [`docs/datasets/nsrdb.md`](docs/datasets/nsrdb.md) |
-| [Long-Term AFib DB](https://physionet.org/content/ltafdb/) | Évaluation externe (généralisation) | [`docs/datasets/ltafdb.md`](docs/datasets/ltafdb.md) |
+| Dataset | Rôle | Patients | Fenêtres (60 battements) | FA |
+|---|---|---|---|---|
+| [MIT-BIH AFib DB](https://physionet.org/content/afdb/) | Entraînement + validation interne (`GroupKFold` par patient) | 25 | 40 613 | 43,6 % |
+| [Long-Term AFib DB](https://physionet.org/content/ltafdb/) | Évaluation externe — aucun réglage sur cette base | 84 | 299 727 | 58,1 % |
 
-Tous les datasets sont libres et téléchargés automatiquement via la commande `make data`. Pour la motivation de chaque dataset et les pièges méthodologiques associés, voir [`docs/datasets/README.md`](docs/datasets/README.md).
+Ces deux bases sont libres et téléchargées automatiquement via `make data`. Pour la justification du couple, le pipeline d'extraction RR, les bases écartées (NSRDB, CinC 2017) et les limites, voir [`docs/datasets.md`](docs/datasets.md).
 
 ## Quick start
 

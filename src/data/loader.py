@@ -6,7 +6,7 @@ across two annotation files:
 - ``.qrs`` — machine-detected beat positions (typically all symbols ``N``)
 - ``.atr`` — reference rhythm annotations (``(AFIB``, ``(N``...) using ``+`` symbols
 
-Others (NSRDB, LTAFDB) store everything in a single ``.atr`` file.
+Others (LTAFDB) store everything in a single ``.atr`` file.
 
 This module exposes a uniform ``load_record_metadata`` that returns *both* a beat
 annotation and a rhythm annotation, picking the right source automatically.

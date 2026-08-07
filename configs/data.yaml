@@ -1,27 +1,22 @@
 # Configuration de référence du pipeline de données.
 # Les valeurs ci-dessous sont celles effectivement utilisées par toutes les
 # expériences rapportées (phases 2 à 5) : fenêtre de 60 battements, pas de 30.
+# Deux bases, et deux seulement. Les alternatives ont été examinées puis
+# écartées pour des raisons méthodologiques, documentées dans docs/datasets.md :
+#   - NSRDB   : sujets 100 % sains, donc non notables au sens du F1 par patient
+#               (cf. src/utils/metrics.py) ; AFDB fournit déjà 56 % de fenêtres
+#               non-FA, le besoin de négatifs supplémentaires n'existe pas.
+#   - CinC 2017 : labels au niveau de l'enregistrement sur des segments de ~30 s
+#               → ni alternance RS/FA intra-patient, ni F1 par patient possible.
 datasets:
   afdb:
     physionet_id: afdb
     enabled: true
     role: train_val
-  nsrdb:
-    # Téléchargée à titre exploratoire (phase 1) mais NON utilisée par les
-    # expériences rapportées : AFDB contient déjà 56 % de fenêtres non-FA, et
-    # ajouter des sujets 100 % sains fausserait le F1 par patient (un patient
-    # sans aucun épisode de FA n'est pas notable, cf. src/utils/metrics.py).
-    physionet_id: nsrdb
-    enabled: false
-    role: unused
   ltafdb:
     physionet_id: ltafdb
     enabled: true
     role: external_test
-  cinc2017:
-    physionet_id: challenge-2017/1.0.0
-    enabled: false
-    role: external_test_short
 
 paths:
   raw_dir: data/raw
