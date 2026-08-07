@@ -71,7 +71,7 @@ Travaux phares (utiles comme contexte mais éloignés de notre approche RR-only)
 | Dataset | Particularité | Piège à connaître |
 |---|---|---|
 | **MIT-BIH AFDB** | 25 patients, 10h chacun, annotations beat-level fiables | Très **peu de patients** → le risque overfitting patient est énorme |
-| **MIT-BIH NSRDB** | 18 sujets sains, rythme sinusal pur | Sert d'augmentation de la classe négative ; **distribution différente** d'AFDB (hôpital vs ambulatoire) |
+| **MIT-BIH NSRDB** | 18 sujets sains, rythme sinusal pur | Souvent utilisée comme augmentation de la classe négative, mais **distribution différente** d'AFDB et sujets sans aucun épisode de FA — **non retenue ici** (voir `docs/datasets.md`) |
 | **Long-Term AFib DB (LTAFDB)** | 84 enregistrements 24-25h | Annotations parfois moins précises que AFDB ; bon **test de généralisation externe** |
 | **PhysioNet/CinC 2017** | 8 528 enregistrements **courts (~30s)**, annotés à 4 classes (Normal/AF/Other/Noisy) | Domaine différent (segments très courts) → bonus pour montrer la robustesse cross-domain |
 

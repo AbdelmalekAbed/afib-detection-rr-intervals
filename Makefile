@@ -1,4 +1,4 @@
-.PHONY: help setup data train eval demo test lint format clean report-pdf report-clean report-watch
+.PHONY: help setup data figures train eval demo test lint format clean report-pdf report-clean report-watch
 
 PYTHON_VERSION ?= 3.12
 VENV           ?= .venv
@@ -10,6 +10,7 @@ help:
 	@echo "Targets:"
 	@echo "  setup    - create venv and install project (CPU PyTorch) via uv"
 	@echo "  data     - download PhysioNet datasets and build processed splits"
+	@echo "  figures  - regenerate the phase 1 EDA figures and their PDF versions"
 	@echo "  train    - train the default CNN-LSTM model (configs/train.yaml)"
 	@echo "  eval     - evaluate on internal + external test sets"
 	@echo "  demo     - launch the Streamlit demo"
@@ -32,6 +33,10 @@ setup:
 data:
 	$(PY) -m scripts.download_data --config configs/data.yaml
 	$(PY) -m scripts.build_windows  --config configs/data.yaml
+
+figures:
+	$(PY) -m scripts.eda_figures
+	$(PY) scripts/png_to_pdf.py
 
 train:
 	$(PY) -m src.train --config configs/train.yaml
