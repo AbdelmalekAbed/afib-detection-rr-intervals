@@ -1,4 +1,4 @@
-.PHONY: help setup data figures train eval demo test lint format clean report-pdf report-clean report-watch
+.PHONY: help setup data figures train eval demo test lint format clean report-pdf report-clean report-watch web-setup web-prepare web-build web web-api-test web-browser-test
 
 PYTHON_VERSION ?= 3.12
 VENV           ?= .venv
@@ -14,6 +14,10 @@ help:
 	@echo "  train    - train the default CNN-LSTM model (configs/train.yaml)"
 	@echo "  eval     - evaluate on internal + external test sets"
 	@echo "  demo     - launch the Streamlit demo"
+	@echo "  web-setup   - install isolated FastAPI + React environments"
+	@echo "  web-prepare - index the validated v2 candidate (once)"
+	@echo "  web-build   - compile the React interface"
+	@echo "  web         - serve React + FastAPI at http://127.0.0.1:8000"
 	@echo "  test     - run unit tests"
 	@echo "  lint     - run ruff checks"
 	@echo "  format   - run black + ruff --fix"
@@ -46,6 +50,28 @@ eval:
 
 demo:
 	$(VENV)/bin/streamlit run app/streamlit_app.py
+
+# New interface: scientific packages remain in their original environment.
+web-setup:
+	$(UV) venv .venv-web --python $(PY)
+	$(UV) pip install --python .venv-web/bin/python -r requirements-web.txt
+	$(PY) -m scripts.link_web_environment
+	cd web && npm ci --ignore-scripts --no-audit --no-fund
+
+web-prepare:
+	$(PY) -m scripts.prepare_interface
+
+web-build:
+	cd web && npm run build
+
+web:
+	PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2 .venv-web/bin/python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+
+web-api-test:
+	PYTHONDONTWRITEBYTECODE=1 .venv-web/bin/python -m pytest tests/test_api.py -q -p no:cacheprovider
+
+web-browser-test:
+	cd web && npm run test:e2e
 
 test:
 	$(VENV)/bin/pytest

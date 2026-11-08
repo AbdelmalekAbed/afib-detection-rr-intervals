@@ -6,9 +6,43 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-CPU-orange.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-Phase%207%20%E2%80%94%20Report-yellow.svg)]()
-[![Tests](https://img.shields.io/badge/tests-29%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen.svg)]()
 [![Streamlit](https://img.shields.io/badge/Streamlit-AFib%20Sandbox-FF4B4B?logo=streamlit)](app/README.md)
 [![Report](https://img.shields.io/badge/Report-63%20pages-008080?logo=overleaf)](report/README.md)
+
+## État technique actuel — fiabilisation et optimisation v2
+
+Le code dispose désormais d'une validation imbriquée par patient, de sorties
+protégées contre les écrasements et d'une recherche qui peut conserver la
+variabilité relative des RR. Le CNN-LSTM optimisé atteint un F1 patient AFDB
+de **0,865** avec seuil choisi en interne, et **0,832 sur LTAFDB** au seuil fixe.
+Les protocoles et limites sont détaillés dans [`docs/reliability.md`](docs/reliability.md)
+et [`docs/optimization.md`](docs/optimization.md).
+
+Les résultats présentés plus bas et les artefacts de `reports/` décrivent la
+**campagne historique**, conservée pour la traçabilité. Les nouvelles expériences
+sont enregistrées séparément sous `artifacts/optimization_v2/` (non versionné).
+Le mémoire et la démo Streamlit utilisent encore leurs artefacts historiques ;
+leur mise à jour suivra la stabilisation technique.
+
+## Nouvelle interface locale — React + FastAPI
+
+**AFib Lab** présente les résultats v2 dans six espaces : synthèse, patients,
+comparaison CNN-LSTM/HRV, compression, généralisation et laboratoire RR avec
+inférence ONNX réelle. L'application est disponible en français, sur ordinateur
+et mobile. Streamlit reste accessible comme démonstration historique.
+
+Sur cette machine, l'interface est préparée et compilée :
+
+```bash
+make web
+# Ouvrir http://127.0.0.1:8000
+```
+
+Pour une nouvelle installation et les prérequis des artefacts, consulter
+[`docs/interface.md`](docs/interface.md). Les dépendances web sont isolées dans
+`.venv-web` ; l'environnement scientifique et le mémoire sont conservés.
+Cette étape fournit une application locale, sans publication en ligne.
 
 ## Live Demo
 
