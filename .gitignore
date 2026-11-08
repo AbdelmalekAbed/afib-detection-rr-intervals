@@ -13,6 +13,7 @@ dist/
 
 # Virtual environments
 .venv/
+.venv-web/
 venv/
 env/
 ENV/
@@ -93,6 +94,12 @@ mlflow/
 
 # Ruff cache
 .ruff_cache/
+
+# React interface
+node_modules/
+*.tsbuildinfo
+web/test-results/
+web/playwright-report/
 
 # Local-only reference material (not for the public repo)
 instructions report/
