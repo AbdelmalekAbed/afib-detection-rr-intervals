@@ -35,7 +35,6 @@ import numpy as np
 import torch
 from sklearn.metrics import f1_score
 from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -44,9 +43,11 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.baselines.cv import zscore_per_window
 from src.data.build import build_windows
 from src.models.cnn_lstm import CNNLSTM
+from src.utils.artifacts import new_run_dir, provenance, require_new_directory
 from src.utils.metrics import per_patient_f1, ranking_metrics, threshold_metrics
 from src.utils.seed import set_seed
 from src.utils.splits import patient_kfold
+from src.validation import fit_selected, fit_torch
 
 WINDOW = 60
 STRIDE = 30
@@ -94,56 +95,6 @@ def make_model(best: dict, input_length: int) -> CNNLSTM:
 # --------------------------------------------------------------------------- #
 # Training
 # --------------------------------------------------------------------------- #
-def train(
-    model: nn.Module,
-    X_tr: np.ndarray, y_tr: np.ndarray,
-    X_va: np.ndarray | None, y_va: np.ndarray | None,
-    epochs: int, lr: float, weight_decay: float,
-    batch_size: int, patience: int, pos_weight: float, seed: int,
-) -> tuple[dict, np.ndarray | None]:
-    """Train; if a val split is given, do early stopping on val loss and return the best state."""
-    torch.manual_seed(seed)
-    Xt = torch.from_numpy(X_tr).float()
-    yt = torch.from_numpy(y_tr.astype(np.float32))
-    has_val = X_va is not None and y_va is not None
-    if has_val:
-        Xv = torch.from_numpy(X_va).float()
-        yv = torch.from_numpy(y_va.astype(np.float32))
-    loader = DataLoader(TensorDataset(Xt, yt), batch_size=batch_size, shuffle=True)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    pw = torch.tensor([pos_weight], dtype=torch.float32)
-    crit = nn.BCEWithLogitsLoss(pos_weight=pw)
-
-    best_loss = float("inf")
-    best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-    best_scores = None
-    bad = 0
-    for _ in range(epochs):
-        model.train()
-        for xb, yb in loader:
-            optim.zero_grad()
-            crit(model(xb), yb).backward()
-            optim.step()
-        if not has_val:
-            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-            continue
-        model.eval()
-        with torch.no_grad():
-            val_logits = model(Xv)
-            val_loss = float(crit(val_logits, yv).item())
-            scores = torch.sigmoid(val_logits).cpu().numpy()
-        if val_loss < best_loss - 1e-4:
-            best_loss = val_loss
-            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-            best_scores = scores
-            bad = 0
-        else:
-            bad += 1
-            if bad >= patience:
-                break
-    return best_state, best_scores
-
-
 def predict(model: nn.Module, X: np.ndarray, batch_size: int = 1024) -> np.ndarray:
     model.eval()
     out = np.empty(len(X), dtype=np.float32)
@@ -184,8 +135,8 @@ def main():
     ap.add_argument("--epochs-source", type=int, default=EPOCHS_SOURCE)
     ap.add_argument("--epochs-scratch", type=int, default=EPOCHS_SCRATCH)
     ap.add_argument("--epochs-finetune", type=int, default=EPOCHS_FINETUNE)
-    ap.add_argument("--out-dir", type=Path, default=PROJECT_ROOT / "reports")
-    ap.add_argument("--ckpt-dir", type=Path, default=PROJECT_ROOT / "reports" / "checkpoints")
+    ap.add_argument("--out-dir", type=Path, default=None)
+    ap.add_argument("--ckpt-dir", type=Path, default=None)
     ap.add_argument("--params-json", type=Path,
                     default=PROJECT_ROOT / "reports" / "phase35_best_params.json")
     ap.add_argument("--out-prefix", type=str, default="phase5")
@@ -194,7 +145,8 @@ def main():
 
     set_seed(SEED)
     torch.set_num_threads(4)
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+    args.out_dir = require_new_directory(args.out_dir) if args.out_dir else new_run_dir(PROJECT_ROOT / "artifacts", "cross_dataset_v2")
+    args.ckpt_dir = require_new_directory(args.ckpt_dir) if args.ckpt_dir else args.out_dir / "checkpoints"
     args.ckpt_dir.mkdir(parents=True, exist_ok=True)
     fig_dir = args.out_dir / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
@@ -220,28 +172,21 @@ def main():
     n_params = sum(p.numel() for p in make_model(best, WINDOW).parameters())
     print(f"[params] model parameter count: {n_params:,}")
 
-    # 3. Source training : AFDB full → 1 modèle. On garde 1 fold pour early-stop interne.
-    print("[source] training on AFDB (val = fold 0 for early stopping)")
-    folds = list(patient_kfold(ga, ya, n_splits=args.n_splits))
-    tr0, va0 = folds[0]
-    n_pos = max(int(ya[tr0].sum()), 1)
-    pw_src = (len(ya[tr0]) - n_pos) / n_pos
-    src_model = make_model(best, WINDOW)
-    t0 = time.time()
-    src_state, _ = train(
-        src_model, Xan[tr0], ya[tr0], Xan[va0], ya[va0],
+    # Select epochs on an AFDB-only holdout; then fit the source on ALL AFDB.
+    tr0, va0 = next(patient_kfold(ga, ya, n_splits=args.n_splits))
+    source_selection = fit_torch(
+        lambda: make_model(best, WINDOW), Xan[tr0], ya[tr0], X_val=Xan[va0], y_val=ya[va0],
         epochs=args.epochs_source, lr=best["lr"], weight_decay=weight_decay,
-        batch_size=BATCH_SIZE, patience=PATIENCE, pos_weight=pw_src, seed=SEED,
-    )
+        batch_size=BATCH_SIZE, patience=PATIENCE, seed=SEED)
+    afdb_internal = metric_block(ya[va0], source_selection.scores, ga[va0])
+    source_fit = fit_torch(
+        lambda: make_model(best, WINDOW), Xan, ya, epochs=source_selection.best_epoch,
+        lr=best["lr"], weight_decay=weight_decay, batch_size=BATCH_SIZE, seed=SEED + 999)
+    src_state = source_fit.state
+    src_model = make_model(best, WINDOW)
     src_model.load_state_dict(src_state)
     torch.save(src_state, args.ckpt_dir / "phase5_source_afdb.pt")
-    print(f"  source trained in {time.time()-t0:.1f}s")
-
-    # AFDB internal benchmark from this single model on fold 0 val
-    scores_a_internal = predict(src_model, Xan[va0])
-    afdb_internal = metric_block(ya[va0], scores_a_internal, ga[va0])
-    print(f"[afdb_internal_fold0] F1/patient={afdb_internal['mean_patient_f1']:.4f} "
-          f"AUROC={afdb_internal['auroc']:.4f}")
+    print(f"[source] {len(np.unique(ga))} patients AFDB, {source_selection.best_epoch} époques", flush=True)
 
     # 4. Zero-shot LTAFDB
     t0 = time.time()
@@ -254,18 +199,19 @@ def main():
 
     # 5. LTAFDB-only 5-fold from scratch — measure intrinsic LTAFDB ceiling
     print(f"[ltafdb_scratch] {args.n_splits}-fold patient-level OOF — from-scratch CNN-LSTM on LTAFDB")
+    scratch_selections, finetune_selections = [], []
     oof_scratch = np.full(len(yl), np.nan, dtype=np.float32)
     fold_arr = np.full(len(yl), -1, dtype=np.int8)
     for k, (tr, va) in enumerate(patient_kfold(gl, yl, n_splits=args.n_splits)):
-        n_pos = max(int(yl[tr].sum()), 1)
-        pw = (len(yl[tr]) - n_pos) / n_pos
         m = make_model(best, WINDOW)
         t0 = time.time()
-        _, scores_va = train(
-            m, Xln[tr], yl[tr], Xln[va], yl[va],
+        fitted, selected = fit_selected(
+            lambda: make_model(best, WINDOW), Xln[tr], yl[tr], gl[tr],
             epochs=args.epochs_scratch, lr=best["lr"], weight_decay=weight_decay,
-            batch_size=BATCH_SIZE, patience=PATIENCE, pos_weight=pw, seed=SEED + k,
-        )
+            batch_size=BATCH_SIZE, patience=PATIENCE, seed=SEED + k * 1000)
+        m.load_state_dict(fitted.state)
+        scores_va = predict(m, Xln[va])
+        scratch_selections.append({"fold": k, **selected})
         oof_scratch[va] = scores_va
         fold_arr[va] = k
         print(f"  fold {k}: trained in {time.time()-t0:.1f}s, val_size={len(va)}")
@@ -279,16 +225,21 @@ def main():
     oof_ft = np.full(len(yl), np.nan, dtype=np.float32)
     finetune_lr = best["lr"] * 0.3
     for k, (tr, va) in enumerate(patient_kfold(gl, yl, n_splits=args.n_splits)):
-        n_pos = max(int(yl[tr].sum()), 1)
-        pw = (len(yl[tr]) - n_pos) / n_pos
         m = make_model(best, WINDOW)
         m.load_state_dict(copy.deepcopy(src_state))
         t0 = time.time()
-        _, scores_va = train(
-            m, Xln[tr], yl[tr], Xln[va], yl[va],
+        def pretrained_factory():
+            model = make_model(best, WINDOW)
+            model.load_state_dict(copy.deepcopy(src_state))
+            return model
+
+        fitted, selected = fit_selected(
+            pretrained_factory, Xln[tr], yl[tr], gl[tr],
             epochs=args.epochs_finetune, lr=finetune_lr, weight_decay=weight_decay,
-            batch_size=BATCH_SIZE, patience=PATIENCE, pos_weight=pw, seed=SEED + 100 + k,
-        )
+            batch_size=BATCH_SIZE, patience=PATIENCE, seed=SEED + 100 + k * 1000)
+        m.load_state_dict(fitted.state)
+        scores_va = predict(m, Xln[va])
+        finetune_selections.append({"fold": k, **selected})
         oof_ft[va] = scores_va
         print(f"  fold {k}: fine-tuned in {time.time()-t0:.1f}s")
     ft_metrics = metric_block(yl, oof_ft, gl)
@@ -298,6 +249,12 @@ def main():
 
     # 7. Persist results
     out_json = {
+        "protocol": "nested_epoch_selection_fixed_historical_architecture_v2",
+        "source": {"precision": "fp32", "training_patients": np.unique(ga).tolist(),
+                   "epochs": source_selection.best_epoch,
+                   "internal_reference": "AFDB holdout of the epoch-selection model, NOT the full source"},
+        "selection": {"scratch": scratch_selections, "finetuned": finetune_selections},
+        "provenance": provenance([args.params_json, Path(__file__)]),
         "config": {
             "window": WINDOW, "stride": STRIDE, "n_splits": args.n_splits,
             "epochs_source": args.epochs_source, "epochs_scratch": args.epochs_scratch,
@@ -324,7 +281,7 @@ def main():
         },
     }
     (args.out_dir / f"{args.out_prefix}_results.json").write_text(json.dumps(out_json, indent=2))
-    print(f"[save] reports/{args.out_prefix}_results.json")
+    print(f"[save] {args.out_dir}/{args.out_prefix}_results.json")
 
     import pandas as pd
     rows = [
@@ -335,7 +292,7 @@ def main():
     ]
     df = pd.DataFrame(rows)
     df.to_csv(args.out_dir / f"{args.out_prefix}_cross_dataset.csv", index=False)
-    print(f"[save] reports/{args.out_prefix}_cross_dataset.csv\n{df.to_string(index=False)}")
+    print(f"[save] {args.out_dir}/{args.out_prefix}_cross_dataset.csv\n{df.to_string(index=False)}")
 
     np.savez(
         args.out_dir / f"{args.out_prefix}_oof_scores.npz",
@@ -344,7 +301,7 @@ def main():
         scratch=oof_scratch.astype(np.float32),
         finetuned=oof_ft.astype(np.float32),
     )
-    print(f"[save] reports/{args.out_prefix}_oof_scores.npz")
+    print(f"[save] {args.out_dir}/{args.out_prefix}_oof_scores.npz")
 
     # 8. Figures
     import matplotlib

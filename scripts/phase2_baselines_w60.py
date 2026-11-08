@@ -9,7 +9,7 @@ Sortie : reports/phase2_baselines_w60.json + tableau imprimé.
 """
 from __future__ import annotations
 
-import json
+import argparse
 import sys
 import time
 from pathlib import Path
@@ -26,8 +26,9 @@ from sklearn.metrics import confusion_matrix, f1_score
 
 from src.baselines.cv import crossval_sklearn_oof, crossval_torch_oof
 from src.data.build import build_windows
-from src.features.hrv import coefficient_of_variation, featurize_windows
+from src.features.hrv import FEATURE_VERSION, coefficient_of_variation, featurize_windows
 from src.models.baselines import CNNOnly, LSTMOnly, build_hrv_baseline
+from src.utils.artifacts import new_run_dir, provenance, require_new_directory, write_json
 from src.utils.metrics import per_patient_f1, ranking_metrics, threshold_metrics
 from src.utils.seed import set_seed
 from src.utils.splits import patient_kfold
@@ -47,7 +48,7 @@ def metric_block(y, score, groups, hard=None):
     else:
         tn, fp, fn, tp = confusion_matrix(y, hard, labels=[0, 1]).ravel()
         out.update({
-            "threshold": float("nan"),
+            "threshold": None,
             "f1": float(f1_score(y, hard, zero_division=0)),
             "sensitivity": float(tp / (tp + fn) if (tp + fn) else 0.0),
             "specificity": float(tn / (tn + fp) if (tn + fp) else 0.0),
@@ -94,6 +95,13 @@ def gb_factory():
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out-dir", type=Path)
+    parser.add_argument("--models", nargs="+", choices=["rule_cv", "hrv_rf", "gb_hist", "cnn_only", "lstm_only"],
+                        default=["rule_cv", "hrv_rf", "gb_hist", "cnn_only", "lstm_only"])
+    parser.add_argument("--epochs", type=int, default=12)
+    args = parser.parse_args()
+    out_dir = require_new_directory(args.out_dir) if args.out_dir else new_run_dir(PROJECT_ROOT / "artifacts", "baselines_v2")
     set_seed(SEED)
     torch.set_num_threads(4)
     t0 = time.time()
@@ -113,56 +121,69 @@ def main():
     for k, (_, va) in enumerate(patient_kfold(groups, y, n_splits=N_SPLITS)):
         fold_arr[va] = k
 
-    pred = rule_oof(cv, y, groups, N_SPLITS)
-    results["rule_cv"] = metric_block(y, cv, groups, hard=pred)
-    oof_table["rule_cv"] = pred.astype(np.float32)  # décisions dures 0/1
-    print(f"[rule] F1/patient={results['rule_cv']['mean_patient_f1']:.3f}", flush=True)
+    selections = {}
+    if "rule_cv" in args.models:
+        pred = rule_oof(cv, y, groups, N_SPLITS)
+        results["rule_cv"] = metric_block(y, cv, groups, hard=pred)
+        oof_table["rule_cv"] = pred.astype(np.float32)  # décisions dures 0/1
+        print(f"[rule] F1/patient={results['rule_cv']['mean_patient_f1']:.3f}", flush=True)
 
-    oof = crossval_sklearn_oof(lambda: build_hrv_baseline(n_estimators=300), F, y, groups, N_SPLITS)
-    results["hrv_rf"] = metric_block(y, oof.y_score, groups)
-    oof_table["hrv_rf"] = oof.y_score
-    print(f"[rf]   F1/patient={results['hrv_rf']['mean_patient_f1']:.3f}", flush=True)
+    if "hrv_rf" in args.models:
+        oof = crossval_sklearn_oof(lambda: build_hrv_baseline(n_estimators=300), F, y, groups, N_SPLITS)
+        results["hrv_rf"] = metric_block(y, oof.y_score, groups)
+        oof_table["hrv_rf"] = oof.y_score
+        print(f"[rf]   F1/patient={results['hrv_rf']['mean_patient_f1']:.3f}", flush=True)
 
-    oof = crossval_sklearn_oof(gb_factory, F, y, groups, N_SPLITS)
-    results["gb_hist"] = metric_block(y, oof.y_score, groups)
-    oof_table["gb_hist"] = oof.y_score
-    print(f"[gb]   F1/patient={results['gb_hist']['mean_patient_f1']:.3f}", flush=True)
+    if "gb_hist" in args.models:
+        oof = crossval_sklearn_oof(gb_factory, F, y, groups, N_SPLITS)
+        results["gb_hist"] = metric_block(y, oof.y_score, groups)
+        oof_table["gb_hist"] = oof.y_score
+        print(f"[gb]   F1/patient={results['gb_hist']['mean_patient_f1']:.3f}", flush=True)
 
-    oof = crossval_torch_oof(
-        lambda: CNNOnly(input_length=WINDOW, channels=(16, 32), kernel=5),
-        X, y, groups, n_splits=N_SPLITS, epochs=12, batch_size=512, lr=1e-3, patience=3, seed=SEED,
-    )
-    results["cnn_only"] = metric_block(y, oof.y_score, groups)
-    oof_table["cnn_only"] = oof.y_score
-    print(f"[cnn]  F1/patient={results['cnn_only']['mean_patient_f1']:.3f}", flush=True)
+    if "cnn_only" in args.models:
+        oof = crossval_torch_oof(
+            lambda: CNNOnly(input_length=WINDOW, channels=(16, 32), kernel=5),
+            X, y, groups, n_splits=N_SPLITS, epochs=args.epochs, batch_size=512, lr=1e-3, patience=3, seed=SEED,
+        )
+        results["cnn_only"] = metric_block(y, oof.y_score, groups)
+        oof_table["cnn_only"] = oof.y_score
+        print(f"[cnn]  F1/patient={results['cnn_only']['mean_patient_f1']:.3f}", flush=True)
+        selections["cnn_only"] = oof.selection
+        oof_table["cnn_only_thresholds"] = oof.thresholds
 
-    oof = crossval_torch_oof(
-        lambda: LSTMOnly(hidden=32, layers=1, bidirectional=True),
-        X, y, groups, n_splits=N_SPLITS, epochs=12, batch_size=512, lr=1e-3, patience=3, seed=SEED,
-    )
-    results["lstm_only"] = metric_block(y, oof.y_score, groups)
-    oof_table["lstm_only"] = oof.y_score
-    print(f"[lstm] F1/patient={results['lstm_only']['mean_patient_f1']:.3f}", flush=True)
+    if "lstm_only" in args.models:
+        oof = crossval_torch_oof(
+            lambda: LSTMOnly(hidden=32, layers=1, bidirectional=True),
+            X, y, groups, n_splits=N_SPLITS, epochs=args.epochs, batch_size=512, lr=1e-3, patience=3, seed=SEED,
+        )
+        results["lstm_only"] = metric_block(y, oof.y_score, groups)
+        oof_table["lstm_only"] = oof.y_score
+        print(f"[lstm] F1/patient={results['lstm_only']['mean_patient_f1']:.3f}", flush=True)
+        selections["lstm_only"] = oof.selection
+        oof_table["lstm_only_thresholds"] = oof.thresholds
 
     meta = {"window": WINDOW, "stride": STRIDE, "n_splits": N_SPLITS, "seed": SEED,
-            "n_samples": int(len(y)), "n_patients": int(len(np.unique(groups))), "afib_rate": float(y.mean())}
-    (PROJECT_ROOT / "reports" / "phase2_baselines_w60.json").write_text(
-        json.dumps({"meta": meta, "results": results}, indent=2))
+            "n_samples": int(len(y)), "n_patients": int(len(np.unique(groups))), "afib_rate": float(y.mean()),
+            "feature_version": FEATURE_VERSION, "neural_protocol": "nested_epoch_threshold_selection_v1",
+            "epochs_max": args.epochs, "selection": selections, "provenance": provenance([Path(__file__)])}
+    write_json(out_dir / "phase2_baselines_w60.json", {"meta": meta, "results": results})
 
     np.savez(
-        PROJECT_ROOT / "reports" / "phase2_oof_scores.npz",
+        out_dir / "phase2_oof_scores.npz",
         y=y.astype(np.int8), groups=groups.astype(str), fold=fold_arr,
         **{k: v.astype(np.float32) for k, v in oof_table.items()},
     )
-    print("[save] reports/phase2_oof_scores.npz")
+    print(f"[save] {out_dir}/phase2_oof_scores.npz")
 
     labels = {"rule_cv": "Règle métier (CV)", "hrv_rf": "Forêt aléatoire (HRV)",
               "gb_hist": "Gradient boosting", "cnn_only": "CNN 1D seul", "lstm_only": "LSTM seul"}
     print(f"\n{'Méthode':<24}{'F1/pat':>8}{'AUROC':>8}{'Sens':>8}{'Spéc':>8}{'F1win':>8}")
     for k, lab in labels.items():
+        if k not in results:
+            continue
         r = results[k]
         print(f"{lab:<24}{r['mean_patient_f1']:>8.3f}{r['auroc']:>8.3f}{r['sensitivity']:>8.3f}{r['specificity']:>8.3f}{r['f1']:>8.3f}")
-    print("\n[done] saved reports/phase2_baselines_w60.json")
+    print(f"\n[done] {out_dir}/phase2_baselines_w60.json")
 
 
 if __name__ == "__main__":

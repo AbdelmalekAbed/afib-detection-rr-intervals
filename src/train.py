@@ -1,49 +1,38 @@
-"""Entraînement du CNN-LSTM — `python -m src.train --config configs/train.yaml`.
+"""Nested patient-level training. New runs never overwrite historical reports.
 
-Reproduit en ligne de commande la procédure des phases 3.5 / 4b : validation
-croisée à 5 plis groupée par patient, une entropie croisée binaire pondérée par
-le déséquilibre de chaque pli, un arrêt anticipé sur la perte de validation.
-
-Sorties (dans ``artifacts/<experiment_name>/``) :
-  - ``fold{k}.pt``      : poids de la meilleure époque de chaque pli
-  - ``oof_scores.npz``  : scores hors-pli, étiquettes, patients, indice de pli
-  - ``metrics.json``    : métriques agrégées + configuration utilisée
-
-Le fichier ``oof_scores.npz`` est le point d'entrée de ``src.evaluate``.
-La recherche d'hyperparamètres vit dans ``scripts/optuna_search.py``, qui
-réutilise les mêmes briques.
+Optuna, epoch selection and threshold calibration use outer TRAINING patients
+only. ``--trials 0`` disables hyperparameter tuning and is explicitly recorded
+as a fixed development configuration, not a nested-search estimate.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import time
 from pathlib import Path
 
 import numpy as np
 import torch
 import yaml
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
 
-from src.baselines.cv import zscore_per_window
+from src.data.artifacts import load_windows
 from src.data.build import build_windows
 from src.models.cnn_lstm import CNNLSTM
+from src.models.search import (
+    initial_optimization_candidates,
+    model_from_params,
+    suggest_optimized_params,
+    suggest_params,
+)
+from src.utils.artifacts import (
+    file_digest,
+    new_run_dir,
+    provenance,
+    require_new_directory,
+    snapshot_sources,
+    write_json,
+)
 from src.utils.metrics import per_patient_f1, ranking_metrics, threshold_metrics
-from src.utils.seed import set_seed
-from src.utils.splits import patient_kfold
-
-
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Entraînement du CNN-LSTM sur intervalles RR.")
-    p.add_argument("--config", type=Path, required=True)
-    p.add_argument("--dataset", type=str, default="afdb",
-                   help="Nom du répertoire sous data/raw/ (afdb, ltafdb...).")
-    p.add_argument("--out-dir", type=Path, default=None,
-                   help="Écrase logging.out_dir du fichier de configuration.")
-    p.add_argument("--n-splits", type=int, default=None)
-    p.add_argument("--epochs", type=int, default=None)
-    return p.parse_args()
+from src.validation import nested_torch_oof
 
 
 def load_config(path: Path) -> dict:
@@ -53,9 +42,10 @@ def load_config(path: Path) -> dict:
     root = path.resolve().parent.parent
     for key, rel in (cfg.get("defaults") or {}).items():
         sub_path = root / rel
-        if sub_path.is_file():
-            with sub_path.open() as f:
-                cfg[key] = yaml.safe_load(f)
+        if not sub_path.is_file():
+            raise FileNotFoundError(f"Configuration manquante : {sub_path}")
+        with sub_path.open() as f:
+            cfg[key] = yaml.safe_load(f)
     return cfg
 
 
@@ -81,134 +71,116 @@ def build_model(model_cfg: dict, input_length: int) -> CNNLSTM:
     )
 
 
-def train_fold(
-    model: nn.Module,
-    X_tr: np.ndarray, y_tr: np.ndarray,
-    X_va: np.ndarray, y_va: np.ndarray,
-    epochs: int, batch_size: int, lr: float, weight_decay: float,
-    patience: int, pos_weight: float, seed: int,
-) -> tuple[dict, np.ndarray]:
-    """Entraîne un pli et retourne (poids de la meilleure époque, scores de validation)."""
-    torch.manual_seed(seed)
-    Xt = torch.from_numpy(X_tr).float()
-    yt = torch.from_numpy(y_tr.astype(np.float32))
-    Xv = torch.from_numpy(X_va).float()
-    yv = torch.from_numpy(y_va.astype(np.float32))
-
-    loader = DataLoader(TensorDataset(Xt, yt), batch_size=batch_size, shuffle=True)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    crit = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_weight], dtype=torch.float32))
-
-    best_loss = float("inf")
-    best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-    best_scores: np.ndarray | None = None
-    bad = 0
-    for epoch in range(epochs):
-        model.train()
-        for xb, yb in loader:
-            optim.zero_grad()
-            crit(model(xb), yb).backward()
-            optim.step()
-
-        model.eval()
-        with torch.no_grad():
-            logits = model(Xv)
-            val_loss = float(crit(logits, yv).item())
-            scores = torch.sigmoid(logits).cpu().numpy()
-
-        if val_loss < best_loss - 1e-4:
-            best_loss, bad = val_loss, 0
-            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-            best_scores = scores
-        else:
-            bad += 1
-            if bad >= patience:
-                print(f"    arrêt anticipé à l'époque {epoch + 1}")
-                break
-
-    return best_state, (best_scores if best_scores is not None else scores)
-
-
 def main() -> None:
-    args = parse_args()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--dataset", default="afdb")
+    parser.add_argument("--out-dir", type=Path)
+    parser.add_argument("--n-splits", type=int)
+    parser.add_argument("--inner-splits", type=int)
+    parser.add_argument("--epochs", type=int)
+    parser.add_argument("--trials", type=int, default=None)
+    parser.add_argument("--windows", type=Path, help="Archive RR versionnée, vérifiée avant entraînement.")
+    parser.add_argument("--seed", type=int, default=None)
+    args = parser.parse_args()
     cfg = load_config(args.config)
-
-    tr_cfg = cfg["training"]
-    win_cfg = cfg["data"]["windowing"]
-    pre_cfg = cfg["data"]["preprocessing"]
-    n_splits = args.n_splits or cfg["data"]["split"]["n_folds"]
-    epochs = args.epochs or tr_cfg["epochs"]
-    threshold = cfg["evaluation"]["decision_threshold"]
-
-    set_seed(tr_cfg["seed"])
-    torch.set_num_threads(4)
-
-    out_dir = args.out_dir or Path(cfg["logging"]["out_dir"]) / cfg["logging"]["experiment_name"]
-    out_dir.mkdir(parents=True, exist_ok=True)
-
+    training, data = cfg["training"], cfg["data"]
+    win = data["windowing"]
+    protocol = cfg.get("protocol", {})
+    n_trials = args.trials if args.trials is not None else protocol.get("trials", 3)
+    if n_trials < 0:
+        parser.error("--trials doit être positif ou nul.")
+    for name in ("epochs", "n_splits", "inner_splits"):
+        value = getattr(args, name)
+        if value is not None and value < (1 if name == "epochs" else 2):
+            parser.error(f"--{name.replace('_', '-')} est trop petit.")
+    training["epochs"] = args.epochs if args.epochs is not None else training["epochs"]
+    training["seed"] = args.seed if args.seed is not None else training["seed"]
+    data["split"]["n_folds"] = args.n_splits if args.n_splits is not None else data["split"]["n_folds"]
+    protocol["trials"] = n_trials
+    protocol["inner_splits"] = args.inner_splits or protocol.get("inner_splits", 3)
+    cfg["protocol"] = protocol
+    monitor = {"val_loss": "loss", "val_auroc": "auroc"}.get(training["early_stopping"]["monitor"])
+    if monitor is None:
+        parser.error("Critère d'arrêt anticipé inconnu.")
+    out_dir = (require_new_directory(args.out_dir) if args.out_dir else
+               new_run_dir(Path(cfg["logging"]["out_dir"]), "cnn_lstm_nested_v1"))
     root = args.config.resolve().parent.parent
-    dataset_dir = root / cfg["data"]["paths"]["raw_dir"] / args.dataset
-    t0 = time.time()
-    X, y, groups = build_windows(
-        dataset_dir,
-        window=win_cfg["window_size"],
-        stride=win_cfg["stride"],
-        label_strategy=win_cfg["label_strategy"],
-        min_rr=pre_cfg["clip_rr_seconds"]["min"],
-        max_rr=pre_cfg["clip_rr_seconds"]["max"],
-        verbose=True,
+    run_provenance = provenance([args.config, root / "src" / "validation.py"])
+    snapshot_sources(out_dir / "source_snapshot")
+    clip = data["preprocessing"]["clip_rr_seconds"]
+    if args.windows:
+        cached = load_windows(args.windows, expected_window=win["window_size"], expected_metadata={
+            "dataset": args.dataset, "stride": win["stride"], "label_strategy": win["label_strategy"],
+            "min_rr": clip["min"], "max_rr": clip["max"]})
+        X, y, groups = cached["X"], cached["y"], cached["patient_id"]
+        for name, digest in cached["metadata"].get("raw_annotation_sha256", {}).items():
+            if file_digest(root / data["paths"]["raw_dir"] / args.dataset / name) != digest:
+                raise ValueError(f"Annotation source modifiée : {name}")
+        run_provenance["windows_sha256"] = file_digest(args.windows)
+    else:
+        X, y, groups = build_windows(root / data["paths"]["raw_dir"] / args.dataset,
+                                 window=win["window_size"], stride=win["stride"],
+                                 label_strategy=win["label_strategy"], min_rr=clip["min"],
+                                 max_rr=clip["max"], verbose=True)
+    torch.set_num_threads(4)
+    print(f"[données] {args.dataset} {X.shape}, {len(np.unique(groups))} patients", flush=True)
+
+    def progress(event):
+        with (out_dir / "progress.jsonl").open("a") as stream:
+            stream.write(json.dumps(event, allow_nan=False) + "\n")
+
+    def checkpoint(k, state, details, indices, scores, thresholds):
+        with (out_dir / f"fold{k}.pt").open("xb") as stream:
+            torch.save(state, stream)
+        write_json(out_dir / f"fold{k}_selection.json", details)
+        with (out_dir / f"fold{k}_oof.npz").open("xb") as stream:
+            np.savez(stream, indices=indices, scores=scores, thresholds=thresholds)
+        print(f"[pli {k}] terminé : {details['normalization']}, "
+              f"époques={details['epochs']}, seuil={details['threshold']:.2f}", flush=True)
+
+    optimized = protocol.get("search_space") == "optimized_v2"
+    result = nested_torch_oof(
+        lambda: build_model(cfg["model"], X.shape[1]), X, y, groups,
+        n_splits=data["split"]["n_folds"], inner_splits=protocol["inner_splits"],
+        epochs=training["epochs"], batch_size=training["batch_size"],
+        lr=training["optimizer"]["lr"], weight_decay=training["optimizer"]["weight_decay"],
+        patience=training["early_stopping"]["patience"], seed=training["seed"],
+        suggest_params=(suggest_optimized_params if optimized else
+                        lambda trial: suggest_params(trial, "35")) if n_trials else None,
+        parameterized_factory=lambda params: model_from_params(params, X.shape[1]),
+        n_trials=n_trials,
+        monitor=monitor, objective_metric=protocol.get("objective_metric", "fixed_patient_f1"),
+        startup_trials=protocol.get("startup_trials", 10),
+        initial_params=initial_optimization_candidates() if optimized and n_trials else None,
+        parameter_budget=protocol.get("parameter_budget"),
+        progress_callback=progress, fold_callback=checkpoint,
     )
-    print(f"[données] {args.dataset} : X={X.shape}, {len(np.unique(groups))} patients, "
-          f"charge de FA {y.mean():.3f} ({time.time() - t0:.1f}s)")
-
-    Xn = zscore_per_window(X)
-    model_cfg = cfg["model"]
-    n_params = build_model(model_cfg, win_cfg["window_size"]).num_parameters()
-    print(f"[modèle] {n_params:,} paramètres entraînables")
-
-    oof = np.full(len(y), np.nan, dtype=np.float32)
-    fold_arr = np.full(len(y), -1, dtype=np.int8)
-    for k, (tr, va) in enumerate(patient_kfold(groups, y, n_splits=n_splits)):
-        t0 = time.time()
-        n_pos = max(int(y[tr].sum()), 1)
-        pos_weight = max(len(tr) - n_pos, 1) / n_pos
-        model = build_model(model_cfg, win_cfg["window_size"])
-        state, scores = train_fold(
-            model, Xn[tr], y[tr], Xn[va], y[va],
-            epochs=epochs, batch_size=tr_cfg["batch_size"],
-            lr=tr_cfg["optimizer"]["lr"], weight_decay=tr_cfg["optimizer"]["weight_decay"],
-            patience=tr_cfg["early_stopping"]["patience"],
-            pos_weight=pos_weight, seed=tr_cfg["seed"] + k,
-        )
-        oof[va] = scores
-        fold_arr[va] = k
-        torch.save(state, out_dir / f"fold{k}.pt")
-        print(f"  pli {k} : {len(va)} fenêtres de validation, "
-              f"{len(np.unique(groups[va]))} patients ({time.time() - t0:.1f}s)")
-
-    metrics = {
-        **ranking_metrics(y, oof),
-        **threshold_metrics(y, oof, threshold),
-        **per_patient_f1(y, oof, groups, threshold),
-    }
-    print(f"\n[hors-pli] AUROC={metrics['auroc']:.4f}  F1/fenêtre={metrics['f1']:.4f}  "
-          f"F1/patient={metrics['mean_patient_f1']:.4f} "
-          f"({metrics['n_patients_scored']} patients notables)")
-
-    np.savez(out_dir / "oof_scores.npz", y=y.astype(np.int8),
-             groups=groups.astype(str), fold=fold_arr, scores=oof)
-    (out_dir / "metrics.json").write_text(json.dumps({
-        "dataset": args.dataset,
-        "n_params": int(n_params),
-        "n_splits": n_splits,
-        "epochs": epochs,
-        "threshold": threshold,
-        "data": {"n_samples": int(len(y)), "n_patients": int(len(np.unique(groups))),
-                 "afib_rate": float(y.mean())},
-        "metrics": metrics,
-        "config": {"training": tr_cfg, "windowing": win_cfg},
-    }, indent=2))
-    print(f"[sauvegarde] {out_dir}/ (poids, oof_scores.npz, metrics.json)")
+    fixed_threshold = cfg["evaluation"]["decision_threshold"]
+    fixed = {**ranking_metrics(y, result.y_score),
+             **threshold_metrics(y, result.y_score, fixed_threshold),
+             **per_patient_f1(y, result.y_score, groups, fixed_threshold)}
+    # Binary decisions support the same patient weighting despite per-fold thresholds.
+    calibrated_predictions = (result.y_score >= result.thresholds).astype(np.float32)
+    calibrated = {**threshold_metrics(y, calibrated_predictions),
+                  **per_patient_f1(y, calibrated_predictions, groups)}
+    calibrated.pop("threshold")
+    with (out_dir / "oof_scores.npz").open("xb") as stream:
+        np.savez(stream, y=y, groups=groups.astype(str), fold=result.fold,
+                 scores=result.y_score, thresholds=result.thresholds)
+    write_json(out_dir / "metrics.json", {
+        "protocol": "nested_patient_cv_v1", "dataset": args.dataset,
+        "hyperparameter_selection": "inner_optuna" if n_trials else "fixed_development_config",
+        "config": cfg, "window": X.shape[1], "folds": result.details,
+        "data": {"n_samples": len(y), "n_patients": len(np.unique(groups)), "afib_rate": float(y.mean())},
+        "metrics": fixed, "calibrated_metrics": calibrated,
+        "provenance": run_provenance,
+        "limitations": ["Retrospective development on previously inspected public datasets.",
+                         "Internal CV is not a new prospective clinical validation."],
+    })
+    print(f"[résultat] F1 patient seuil fixe={fixed['mean_patient_f1']:.4f}, "
+          f"seuil interne={calibrated['mean_patient_f1']:.4f}", flush=True)
+    print(f"[sorties] {out_dir}", flush=True)
 
 
 if __name__ == "__main__":

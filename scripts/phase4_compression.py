@@ -40,9 +40,11 @@ from torch.utils.data import DataLoader, TensorDataset
 from src.baselines.cv import zscore_per_window
 from src.data.build import build_windows
 from src.models.cnn_lstm import CNNLSTM
+from src.utils.artifacts import new_run_dir, provenance, require_new_directory
 from src.utils.metrics import per_patient_f1, ranking_metrics, threshold_metrics
 from src.utils.seed import set_seed
 from src.utils.splits import patient_kfold
+from src.validation import nested_torch_oof
 
 WINDOW = 60
 STRIDE = 30
@@ -53,54 +55,6 @@ BATCH_SIZE = 512
 PATIENCE = 3
 LATENCY_WARMUP = 50
 LATENCY_ITERS = 200
-
-
-def train_one_fold_keep_best(
-    model: _nn.Module,
-    X_tr: np.ndarray, y_tr: np.ndarray,
-    X_va: np.ndarray, y_va: np.ndarray,
-    epochs: int, batch_size: int, lr: float, patience: int,
-    pos_weight: float, seed: int,
-) -> tuple[dict, np.ndarray]:
-    """Train and return (best_state_dict, best_val_scores) from the lowest-val-loss epoch."""
-    torch.manual_seed(seed)
-    Xt = torch.from_numpy(X_tr).float()
-    yt = torch.from_numpy(y_tr.astype(np.float32))
-    Xv = torch.from_numpy(X_va).float()
-    yv = torch.from_numpy(y_va.astype(np.float32))
-    loader = DataLoader(TensorDataset(Xt, yt), batch_size=batch_size, shuffle=True)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr)
-    pw = torch.tensor([pos_weight], dtype=torch.float32)
-    crit = _nn.BCEWithLogitsLoss(pos_weight=pw)
-
-    best_loss = float("inf")
-    best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-    best_scores = None
-    bad = 0
-    for _ in range(epochs):
-        model.train()
-        for xb, yb in loader:
-            optim.zero_grad()
-            loss = crit(model(xb), yb)
-            loss.backward()
-            optim.step()
-        model.eval()
-        with torch.no_grad():
-            val_logits = model(Xv)
-            val_loss = float(crit(val_logits, yv).item())
-            scores = torch.sigmoid(val_logits).cpu().numpy()
-        if val_loss < best_loss - 1e-4:
-            best_loss = val_loss
-            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-            best_scores = scores
-            bad = 0
-        else:
-            bad += 1
-            if bad >= patience:
-                break
-    if best_scores is None:
-        best_scores = scores
-    return best_state, best_scores
 
 
 # --------------------------------------------------------------------------- #
@@ -258,8 +212,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--n-splits", type=int, default=N_SPLITS)
     ap.add_argument("--epochs", type=int, default=EPOCHS)
-    ap.add_argument("--out-dir", type=Path, default=PROJECT_ROOT / "reports")
-    ap.add_argument("--ckpt-dir", type=Path, default=PROJECT_ROOT / "reports" / "checkpoints")
+    ap.add_argument("--out-dir", type=Path, default=None)
+    ap.add_argument("--ckpt-dir", type=Path, default=None)
     ap.add_argument(
         "--params-json",
         type=Path,
@@ -288,7 +242,8 @@ def main() -> None:
 
     set_seed(SEED)
     torch.set_num_threads(4)
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+    args.out_dir = require_new_directory(args.out_dir) if args.out_dir else new_run_dir(PROJECT_ROOT / "artifacts", "compression_v2")
+    args.ckpt_dir = require_new_directory(args.ckpt_dir) if args.ckpt_dir else args.out_dir / "checkpoints"
     args.ckpt_dir.mkdir(parents=True, exist_ok=True)
     fig_dir = args.out_dir / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
@@ -307,28 +262,13 @@ def main() -> None:
     n_params = sum(p.numel() for p in make_model(best, WINDOW).parameters())
     print(f"[params] model parameter count: {n_params:,}")
 
-    # 3. 5-fold OOF training — keep one state_dict per fold
-    fold_states: list[dict] = []
-    oof_fp32 = np.full(len(y), np.nan, dtype=np.float32)
-    fold_arr = np.full(len(y), -1, dtype=np.int8)
-    print(f"[train] 5-fold OOF FP32 — epochs={args.epochs}, batch={BATCH_SIZE}, patience={PATIENCE}")
-    for k, (tr, va) in enumerate(patient_kfold(groups, y, n_splits=args.n_splits)):
-        t0 = time.time()
-        n_pos = max(int(y[tr].sum()), 1)
-        n_neg = max(int(len(y[tr]) - n_pos), 1)
-        pw = n_neg / n_pos
-        model = make_model(best, WINDOW)
-        best_state, best_scores = train_one_fold_keep_best(
-            model=model,
-            X_tr=Xn[tr], y_tr=y[tr], X_va=Xn[va], y_va=y[va],
-            epochs=args.epochs, batch_size=BATCH_SIZE, lr=best["lr"],
-            patience=PATIENCE, pos_weight=pw, seed=SEED + k,
-        )
-        oof_fp32[va] = best_scores
-        fold_arr[va] = k
-        fold_states.append(best_state)
-        print(f"  fold {k}: trained in {time.time()-t0:.1f}s, "
-              f"val_size={len(va)}, scored_pos={int(y[va].sum())}")
+    # Fixed architecture from the historical search; epoch/threshold selection is internal.
+    # For fully nested architecture tuning, use src.train instead.
+    result = nested_torch_oof(
+        lambda: make_model(best, WINDOW), X, y, groups, n_splits=args.n_splits,
+        epochs=args.epochs, batch_size=BATCH_SIZE, lr=best["lr"],
+        weight_decay=float(best.get("weight_decay", 0.0)), patience=PATIENCE, seed=SEED)
+    fold_states, oof_fp32, fold_arr = result.states, result.y_score, result.fold
 
     metrics_fp32 = metric_block(y, oof_fp32, groups)
     print(f"[fp32] AUROC={metrics_fp32['auroc']:.4f} F1={metrics_fp32['f1']:.4f} "
@@ -415,7 +355,8 @@ def main() -> None:
         Xt = torch.from_numpy(Xn[tr]).float()
         yt = torch.from_numpy(y[tr].astype(np.float32))
         loader = DataLoader(TensorDataset(Xt, yt), batch_size=BATCH_SIZE, shuffle=True)
-        optim = torch.optim.AdamW(m.parameters(), lr=best["lr"] * 0.3)
+        optim = torch.optim.AdamW(m.parameters(), lr=best["lr"] * 0.3,
+                                  weight_decay=float(best.get("weight_decay", 0.0)))
         crit = _nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pw_tr], dtype=torch.float32))
         torch.manual_seed(SEED + 100 + k_idx)
         m.train()
@@ -448,7 +389,7 @@ def main() -> None:
             m, dummy, str(onnx_path),
             input_names=["rr_window"], output_names=["logit"],
             dynamic_axes={"rr_window": {0: "batch"}, "logit": {0: "batch"}},
-            opset_version=17, external_data=False,
+            opset_version=17, external_data=False, dynamo=False,
         )
         onnx_sizes.append(file_size_kb(onnx_path))
         sess = ort.InferenceSession(str(onnx_path), sess_options=so, providers=["CPUExecutionProvider"])
@@ -497,11 +438,15 @@ def main() -> None:
 
     # 6. Persist results
     out_json = {
+        "protocol": "nested_epoch_selection_fixed_historical_architecture_v2",
+        "selection": result.details,
+        "provenance": provenance([args.params_json, Path(__file__)]),
         "config": {
             "window": WINDOW, "stride": STRIDE, "n_splits": args.n_splits,
             "epochs": args.epochs, "batch_size": BATCH_SIZE, "patience": PATIENCE,
             "seed": SEED, "latency_warmup": LATENCY_WARMUP, "latency_iters": LATENCY_ITERS,
             "torch_threads": torch.get_num_threads(),
+            "effective_weight_decay": float(best.get("weight_decay", 0.0)),
         },
         "best_params": best,
         "n_params": int(n_params),
@@ -512,7 +457,7 @@ def main() -> None:
                           "f1_patient_min": 0.95, "auroc_min": 0.98},
     }
     (args.out_dir / f"{args.out_prefix}_results.json").write_text(json.dumps(out_json, indent=2))
-    print(f"[save] reports/{args.out_prefix}_results.json")
+    print(f"[save] {args.out_dir}/{args.out_prefix}_results.json")
 
     # CSV
     import pandas as pd
@@ -534,7 +479,7 @@ def main() -> None:
         })
     df = pd.DataFrame(rows)
     df.to_csv(args.out_dir / f"{args.out_prefix}_compression.csv", index=False)
-    print(f"[save] reports/{args.out_prefix}_compression.csv\n{df.to_string(index=False)}")
+    print(f"[save] {args.out_dir}/{args.out_prefix}_compression.csv\n{df.to_string(index=False)}")
 
     # Save OOF scores for downstream notebook analysis
     np.savez(
@@ -542,7 +487,7 @@ def main() -> None:
         y=y.astype(np.int8), groups=groups.astype(str), fold=fold_arr,
         **{k: v.astype(np.float32) for k, v in oof_table.items()},
     )
-    print(f"[save] reports/{args.out_prefix}_oof_scores.npz")
+    print(f"[save] {args.out_dir}/{args.out_prefix}_oof_scores.npz")
 
     # Figures
     import matplotlib

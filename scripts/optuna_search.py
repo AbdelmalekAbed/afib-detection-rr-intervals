@@ -6,6 +6,9 @@ des notebooks ``03_ablation.ipynb`` (phase 3) et ``04_phase35_w60.ipynb``
 rejouable sans ouvrir un notebook, et pour que l'espace de recherche vive dans
 un fichier versionné plutôt que dans une cellule.
 
+Cette recherche globale est un outil de développement, PAS une évaluation
+indépendante. Utiliser src.train pour une recherche imbriquée par pli externe.
+
 La fonction objectif maximise le **F1 moyen par patient** calculé sur les scores
 hors-pli d'une validation croisée groupée — et non le F1 par fenêtre — afin
 d'optimiser directement le critère qui sert ensuite à juger le modèle.
@@ -32,66 +35,14 @@ from optuna.samplers import TPESampler
 
 from src.baselines.cv import crossval_torch_oof
 from src.data.build import build_windows
-from src.models.cnn_lstm import CNNLSTM
+from src.utils.artifacts import new_run_dir
 from src.utils.metrics import per_patient_f1
 from src.utils.seed import set_seed
 
 SEED = 42
 
 
-def suggest_params(trial: optuna.Trial, phase: str) -> dict:
-    """Espace de recherche, identique à celui du notebook de la phase concernée.
-
-    Phase 3 : exploration large, sans pénalisation L2.
-    Phase 3.5 : plages resserrées vers les petites architectures, régularisation
-    renforcée (dropout plus élevé, pénalisation L2 ajoutée) — l'objectif étant
-    cette fois de viser une empreinte mémoire réduite.
-    """
-    if phase == "3":
-        return {
-            "n_cnn_blocks": trial.suggest_int("n_cnn_blocks", 2, 3),
-            "cnn_first": trial.suggest_categorical("cnn_first", [8, 16, 24]),
-            "kernel_size": trial.suggest_categorical("kernel_size", [3, 5, 7]),
-            "cnn_dropout": trial.suggest_float("cnn_dropout", 0.1, 0.4),
-            "lstm_hidden": trial.suggest_categorical("lstm_hidden", [16, 32, 48]),
-            "lstm_layers": trial.suggest_int("lstm_layers", 1, 2),
-            "head_hidden": trial.suggest_categorical("head_hidden", [16, 32]),
-            "head_dropout": trial.suggest_float("head_dropout", 0.1, 0.5),
-            "lr": trial.suggest_float("lr", 3e-4, 3e-3, log=True),
-            "weight_decay": 0.0,
-        }
-    return {
-        "n_cnn_blocks": trial.suggest_int("n_cnn_blocks", 2, 3),
-        "cnn_first": trial.suggest_categorical("cnn_first", [8, 16]),
-        "kernel_size": trial.suggest_categorical("kernel_size", [3, 5, 7]),
-        "cnn_dropout": trial.suggest_float("cnn_dropout", 0.2, 0.5),
-        "lstm_hidden": trial.suggest_categorical("lstm_hidden", [16, 32, 48]),
-        "lstm_layers": trial.suggest_int("lstm_layers", 1, 2),
-        "head_hidden": trial.suggest_categorical("head_hidden", [16, 32]),
-        "head_dropout": trial.suggest_float("head_dropout", 0.3, 0.6),
-        "lr": trial.suggest_float("lr", 3e-4, 2e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 3e-3, log=True),
-    }
-
-
-def model_from_params(p: dict, input_length: int) -> CNNLSTM:
-    """Le nombre de filtres double à chaque bloc : (c, 2c) ou (c, 2c, 4c)."""
-    c = p["cnn_first"]
-    channels = (c, c * 2) if p["n_cnn_blocks"] == 2 else (c, c * 2, c * 4)
-    return CNNLSTM(
-        input_length=input_length,
-        cnn_channels=channels,
-        kernel_size=p["kernel_size"],
-        pool_size=2,
-        cnn_dropout=p["cnn_dropout"],
-        batch_norm=True,
-        lstm_hidden=p["lstm_hidden"],
-        lstm_layers=p["lstm_layers"],
-        bidirectional=True,
-        lstm_dropout=0.2 if p["lstm_layers"] > 1 else 0.0,
-        head_hidden=p["head_hidden"],
-        head_dropout=p["head_dropout"],
-    )
+from src.models.search import model_from_params, suggest_params
 
 
 def main() -> None:
@@ -113,7 +64,9 @@ def main() -> None:
     epochs = args.epochs or (8 if args.phase == "3" else 15)
     patience = 2 if args.phase == "3" else 4
     early_stop = "loss" if args.phase == "3" else "auroc"
-    out_path = args.out or PROJECT_ROOT / "reports" / f"optuna_phase{args.phase}_rerun.json"
+    out_path = args.out or new_run_dir(PROJECT_ROOT / "artifacts", "development_search") / f"optuna_phase{args.phase}.json"
+    if out_path.exists() or out_path.with_suffix(".csv").exists():
+        raise FileExistsError("Les sorties de cette recherche existent déjà.")
 
     set_seed(SEED)
     torch.set_num_threads(4)
@@ -158,6 +111,7 @@ def main() -> None:
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps({
+        "protocol": "development_search_NOT_independent_test",
         "phase": args.phase,
         "window": window, "stride": stride,
         "n_trials": args.n_trials, "n_splits_search": args.n_splits_search,

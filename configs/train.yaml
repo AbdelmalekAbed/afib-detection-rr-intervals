@@ -1,6 +1,6 @@
 # Configuration d'entraînement du CNN-LSTM.
-# Ces valeurs sont celles réellement utilisées par les phases 3.5 / 4b / 5 et
-# consommées par `python -m src.train --config configs/train.yaml`.
+# Configuration de développement ; les résultats historiques restent dans reports/.
+# Le protocole corrigé règle les hyperparamètres à l'intérieur de chaque pli train.
 defaults:
   data: configs/data.yaml
   model: configs/model_cnn_lstm.yaml
@@ -34,3 +34,8 @@ logging:
   out_dir: artifacts
   experiment_name: cnn_lstm_phase35
   save_best_only: true
+
+protocol:
+  name: nested_patient_cv_v1
+  inner_splits: 3
+  trials: 3                 # par pli externe ; --trials 0 = configuration fixe explicite

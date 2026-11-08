@@ -24,6 +24,8 @@ class OOFResult:
     """Aligned with ``y``: one OOF score per sample, plus the fold each came from."""
     y_score: np.ndarray
     fold: np.ndarray
+    thresholds: np.ndarray | None = None
+    selection: list[dict] | None = None
 
 
 @dataclass
@@ -138,7 +140,7 @@ def _train_one_torch_fold(
 
 
 def train_with_history(
-    model: nn.Module,
+    model: nn.Module | Callable[[], nn.Module],
     X_tr: np.ndarray,
     y_tr: np.ndarray,
     X_va: np.ndarray,
@@ -149,12 +151,16 @@ def train_with_history(
     pos_weight: float | None = None,
     seed: int = 42,
     zscore: bool = True,
+    weight_decay: float = 0.0,
 ) -> tuple[np.ndarray, TrainingHistory]:
     """Train a single (train, val) split *without* early stopping, returning per-epoch history.
 
-    Used to produce learning-curve figures for the final model.
+    Pass a factory to seed initialization as well as training. A preinitialized
+    module is accepted for compatibility; its initial weights belong to the caller.
     """
     torch.manual_seed(seed)
+    if not isinstance(model, nn.Module):
+        model = model()
     if zscore:
         X_tr = zscore_per_window(X_tr)
         X_va = zscore_per_window(X_va)
@@ -164,7 +170,7 @@ def train_with_history(
     Xv = torch.from_numpy(X_va).float()
     yv = torch.from_numpy(y_va.astype(np.float32))
     loader = DataLoader(TensorDataset(Xt, yt), batch_size=batch_size, shuffle=True)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr)
+    optim = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     pw = torch.tensor([pos_weight], dtype=torch.float32) if pos_weight else None
     crit = nn.BCEWithLogitsLoss(pos_weight=pw)
 
@@ -217,8 +223,25 @@ def crossval_torch_oof(
     seed: int = 42,
     weight_decay: float = 0.0,
     early_stop_metric: str = "loss",
+    inner_splits: int = 3,
+    legacy: bool = False,
 ) -> OOFResult:
-    """OOF sigmoid scores from a torch baseline trained one fold at a time."""
+    """Patient-disjoint OOF; select epochs/threshold only inside training folds.
+
+    ``legacy=True`` is an explicit historical analysis mode: its validation
+    labels select the epoch, so its scores are NOT independent test estimates.
+    """
+    if not legacy:
+        from src.validation import nested_torch_oof
+        result = nested_torch_oof(
+            model_factory, X, y, groups, n_splits=n_splits, inner_splits=inner_splits,
+            epochs=epochs, batch_size=batch_size, lr=lr, patience=patience,
+            use_pos_weight=use_pos_weight, seed=seed, weight_decay=weight_decay,
+            monitor=early_stop_metric,
+        )
+        return OOFResult(result.y_score, result.fold, result.thresholds, result.details)
+    import warnings
+    warnings.warn("Protocole historique : sélection d'époque sur le pli évalué.", stacklevel=2)
     Xn = zscore_per_window(X)
     y_score = np.full(len(y), np.nan, dtype=np.float32)
     fold = np.full(len(y), -1, dtype=np.int8)

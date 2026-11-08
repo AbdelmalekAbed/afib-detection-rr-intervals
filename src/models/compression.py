@@ -46,6 +46,8 @@ def export_onnx(model: nn.Module, input_length: int, out_path: Path) -> Path:
         output_names=["logit"],
         dynamic_axes={"rr_window": {0: "batch"}, "logit": {0: "batch"}},
         opset_version=17,
+        dynamo=False,
+        external_data=False,
     )
     return out_path
 

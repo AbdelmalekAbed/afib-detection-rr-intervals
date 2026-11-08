@@ -12,26 +12,24 @@ résultats bruts laissent ouvertes.
 2. **Sensibilité au seuil.** Toutes les métriques du mémoire sont calculées au
    seuil 0,5, alors que les modèles profonds sont entraînés avec une pondération
    de la classe positive qui décale leurs probabilités. On mesure ce que coûte
-   ce choix : seuil optimal a posteriori, seuil réglé honnêtement sur les autres
-   plis (imbriqué), et borne haute avec un seuil par patient.
+   ce choix : seuil optimal a posteriori, seuil exploratoire réglé sur les autres
+   scores hors-pli (ce n’est pas une validation imbriquée), et borne haute avec un seuil par patient.
 
 3. **Origine du plafond.** On relie le F1 de chaque patient à sa charge de FA
    (proportion de fenêtres positives) pour montrer d'où vient l'écart entre le
    F1 par fenêtre et le F1 par patient.
 
 Sorties :
-  - reports/phase6_analysis.json
-  - reports/phase6_per_patient.csv
-  - reports/figures/19_confidence_intervals.{png,pdf}
-  - reports/figures/20_threshold_sensitivity.{png,pdf}
-  - reports/figures/21_f1_vs_afib_burden.{png,pdf}
-  - reports/figures/22_window_vs_patient.{png,pdf}
+  - artifacts/historical_analysis_<date>/phase6_analysis.json
+  - artifacts/historical_analysis_<date>/phase6_per_patient.csv
+  - artifacts/historical_analysis_<date>/figures/*.{png,pdf}
 
 Exécution depuis la racine du dépôt :
     python -m scripts.phase6_analysis
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -44,7 +42,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 REPORTS = PROJECT_ROOT / "reports"
-FIGURES = REPORTS / "figures"
+FIGURES = PROJECT_ROOT / "artifacts" / "analysis_figures"
+OUTPUTS = PROJECT_ROOT / "artifacts"
+
+from src.utils.artifacts import new_run_dir, provenance
 
 SEED = 42
 N_BOOTSTRAP = 2000
@@ -139,8 +140,8 @@ def threshold_study(
     - ``fixed_0.5``   : ce que rapporte le mémoire.
     - ``best_global`` : meilleur seuil unique choisi *sur les données de test*
       (optimiste, sert de référence haute pour un seuil global).
-    - ``nested``      : seuil choisi sur les autres plis puis appliqué au pli
-      courant — c'est la seule estimation honnête d'un gain réalisable.
+    - ``cross_fold_exploratory_f1`` : seuil choisi sur les autres scores OOF.
+      Leurs modèles ont vu le pli courant : exploration, pas validation imbriquée.
     - ``per_patient_oracle`` : meilleur seuil pour chaque patient pris
       séparément. Non réalisable en pratique (il faut connaître la vérité
       terrain), mais borne supérieure de ce qu'un calibrage par sujet
@@ -162,7 +163,7 @@ def threshold_study(
              for t in THRESHOLD_GRID]
         t_star = float(THRESHOLD_GRID[int(np.argmax(c))])
         nested.append(
-            per_patient_f1_vector(y[te], score[te], groups[te], t_star, pids_te).mean()
+            per_patient_f1_vector(y[te], score[te], groups[te], t_star, pids_te)
         )
 
     oracle = []
@@ -177,7 +178,8 @@ def threshold_study(
         "fixed_0.5": float(per_patient_f1_vector(y, score, groups, 0.5, pids).mean()),
         "best_global_threshold": float(THRESHOLD_GRID[i_best]),
         "best_global_f1": float(curve[i_best]),
-        "nested_f1": float(np.mean(nested)) if nested else float("nan"),
+        "cross_fold_exploratory_f1": float(np.concatenate(nested).mean()) if nested else None,
+        "calibration_protocol": "exploratory_cross_fold_NOT_nested",
         "per_patient_oracle_f1": float(np.mean(oracle)),
         "curve_thresholds": THRESHOLD_GRID.tolist(),
         "curve_f1": curve.tolist(),
@@ -220,7 +222,7 @@ def load_all_afdb_scores() -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     pas=30) et le même découpage patient, donc leurs vecteurs OOF sont alignés
     index par index — c'est ce qui rend la comparaison légitime.
     """
-    p2 = np.load(REPORTS / "phase2_oof_scores.npz", allow_pickle=True)
+    p2 = np.load(REPORTS / "phase2_oof_scores.npz", allow_pickle=False)
     y = p2["y"].astype(int)
     groups = p2["groups"].astype(str)
     fold = p2["fold"]
@@ -228,11 +230,14 @@ def load_all_afdb_scores() -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     scores = {k: p2[k].astype(np.float64) for k in
               ("rule_cv", "hrv_rf", "gb_hist", "cnn_only", "lstm_only")}
 
-    p4 = np.load(REPORTS / "phase4_oof_scores.npz", allow_pickle=True)
-    p4b = np.load(REPORTS / "phase4b_oof_scores.npz", allow_pickle=True)
+    p4 = np.load(REPORTS / "phase4_oof_scores.npz", allow_pickle=False)
+    p4b = np.load(REPORTS / "phase4b_oof_scores.npz", allow_pickle=False)
     if not (np.array_equal(p4["y"].astype(int), y) and np.array_equal(p4b["y"].astype(int), y)):
         raise RuntimeError("les fenêtres des phases 2 / 4 / 4b ne coïncident pas")
 
+    for archive in (p4, p4b):
+        if not (np.array_equal(archive["groups"].astype(str), groups) and np.array_equal(archive["fold"], fold)):
+            raise RuntimeError("Les patients ou plis des phases ne coïncident pas.")
     scores["cnn_lstm_100k"] = p4["fp32"].astype(np.float64)
     scores["cnn_lstm_30k"] = p4b["fp32"].astype(np.float64)
     scores["cnn_lstm_30k_int8"] = p4b["int8_dynamic"].astype(np.float64)
@@ -251,9 +256,6 @@ def save_fig(fig, stem: str) -> None:
     FIGURES.mkdir(parents=True, exist_ok=True)
     fig.savefig(FIGURES / f"{stem}.pdf", bbox_inches="tight")
     fig.savefig(FIGURES / f"{stem}.png", dpi=300, bbox_inches="tight")
-    pdf_dir = PROJECT_ROOT / "report" / "figures"
-    if pdf_dir.is_dir():
-        fig.savefig(pdf_dir / f"{stem}.pdf", bbox_inches="tight")
 
 
 def fig_confidence_intervals(ci: dict, order: list) -> None:
@@ -348,6 +350,13 @@ def fig_window_vs_patient(win: dict, pat: dict, order: list) -> None:
 # Programme principal
 # --------------------------------------------------------------------------- #
 def main() -> None:
+    global FIGURES, OUTPUTS
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out-dir", type=Path)
+    args = parser.parse_args()
+    from src.utils.artifacts import require_new_directory
+    OUTPUTS = require_new_directory(args.out_dir) if args.out_dir else new_run_dir(PROJECT_ROOT / "artifacts", "historical_analysis")
+    FIGURES = OUTPUTS / "figures"
     import matplotlib
     matplotlib.use("Agg")
 
@@ -375,10 +384,10 @@ def main() -> None:
               f"IC95=[{ci[k]['ci95_low']:.4f}, {ci[k]['ci95_high']:.4f}] "
               f"σ_plis={folds[k]['fold_std']:.4f} F1/fen={winf1[k]:.4f}")
 
-    print("\n[seuil] gain réalisable (seuil réglé sur les autres plis)")
+    print("\n[seuil] exploration du seuil (scores historiques, non imbriqués)")
     for k, t in thr.items():
         print(f"  {LABELS[k]:24s} 0,5 → {t['fixed_0.5']:.4f} | "
-              f"imbriqué {t['nested_f1']:.4f} | "
+              f"exploratoire {t['cross_fold_exploratory_f1']:.4f} | "
               f"global optimal {t['best_global_f1']:.4f} (t*={t['best_global_threshold']:.2f}) | "
               f"oracle/patient {t['per_patient_oracle_f1']:.4f}")
 
@@ -432,16 +441,18 @@ def main() -> None:
                              for k, v in burden.items()},
         "gb_minus_cnnlstm": gap,
     }
-    (REPORTS / "phase6_analysis.json").write_text(json.dumps(out, indent=2))
-    print("[save] reports/phase6_analysis.json")
+    out["provenance"] = provenance()
+    out["warning"] = "Historical scores: cross-fold threshold exploration is not nested validation."
+    (OUTPUTS / "phase6_analysis.json").write_text(json.dumps(out, indent=2))
+    print(f"[save] {OUTPUTS}/phase6_analysis.json")
 
     import pandas as pd
     rows = []
     for k in order:
         for r in burden[k]["rows"]:
             rows.append({"method": k, "label": LABELS[k], **r})
-    pd.DataFrame(rows).to_csv(REPORTS / "phase6_per_patient.csv", index=False)
-    print("[save] reports/phase6_per_patient.csv")
+    pd.DataFrame(rows).to_csv(OUTPUTS / "phase6_per_patient.csv", index=False)
+    print(f"[save] {OUTPUTS}/phase6_per_patient.csv")
 
 
 if __name__ == "__main__":
