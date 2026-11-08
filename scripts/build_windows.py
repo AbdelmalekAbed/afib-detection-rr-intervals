@@ -2,20 +2,20 @@
 
 Run via: ``python -m scripts.build_windows --config configs/data.yaml``
 
-Output: a single ``.npz`` per dataset under ``data/processed/`` with arrays
-``X`` (n, window_size), ``y`` (n,), ``patient_id`` (n,).
+Output: a versioned ``dataset_wW_sS_strategy_v1.npz`` under the configured
+processed directory. Includes metadata and annotation hashes; never replaces
+the legacy ``afdb.npz`` / ``ltafdb.npz`` files or an existing versioned archive.
 """
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-import numpy as np
 import yaml
 
-from src.data.loader import list_records, load_record_metadata
-from src.data.rr_extract import clean_rr_series, extract_rr_series
-from src.data.windowing import build_windowed_dataset
+from src.data.artifacts import save_windows, window_filename
+from src.data.build import build_windows
+from src.utils.artifacts import file_digest
 
 
 def main() -> None:
@@ -40,25 +40,19 @@ def main() -> None:
         if not spec.get("enabled", False):
             continue
         dataset_dir = raw_dir / spec["physionet_id"].replace("/", "_")
-        series_by_patient = {}
-        for rec_name in list_records(dataset_dir):
-            try:
-                meta = load_record_metadata(dataset_dir, rec_name)
-                series = extract_rr_series(meta)
-                series = clean_rr_series(series, min_rr=min_rr, max_rr=max_rr)
-                if len(series.rr_seconds) >= window_size:
-                    series_by_patient[rec_name] = series
-            except Exception as e:
-                print(f"  skip {rec_name}: {e}")
-
-        if not series_by_patient:
-            print(f"[skip] {name}: no usable records")
-            continue
-
-        windowed = build_windowed_dataset(series_by_patient, window_size, stride, label_strategy)
-        out_path = out_dir / f"{name}.npz"
-        np.savez_compressed(out_path, X=windowed.X, y=windowed.y, patient_id=windowed.patient_id)
-        print(f"[ok] {name}: {windowed.X.shape} -> {out_path}")
+        out_path = out_dir / window_filename(name, window_size, stride, label_strategy)
+        if out_path.exists():
+            raise FileExistsError(f"{out_path} existe déjà : choisir un autre répertoire de sortie.")
+        X, y, groups = build_windows(dataset_dir, window=window_size, stride=stride,
+                                     label_strategy=label_strategy, min_rr=min_rr,
+                                     max_rr=max_rr, verbose=True)
+        source_files = sorted(p for p in dataset_dir.iterdir() if p.suffix in {".hea", ".atr", ".qrs"})
+        save_windows(out_path, X, y, groups, {
+            "dataset": name, "window": window_size, "stride": stride,
+            "label_strategy": label_strategy, "min_rr": min_rr, "max_rr": max_rr,
+            "raw_annotation_sha256": {p.name: file_digest(p) for p in source_files},
+        })
+        print(f"[ok] {name}: {X.shape} -> {out_path}")
 
 
 if __name__ == "__main__":

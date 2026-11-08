@@ -40,11 +40,22 @@ def download_dataset(physionet_id: str, raw_dir: Path) -> Path:
     """Download a PhysioNet dataset into ``raw_dir / physionet_id``.
 
     Returns the local directory containing the downloaded records.
-    Skips download if the target directory already contains files.
+    Reuses a populated directory only after checking record counts and required
+    annotations. An incomplete directory raises instead of silently succeeding.
     """
     target = raw_dir / physionet_id.replace("/", "_")
     target.mkdir(parents=True, exist_ok=True)
     if any(target.iterdir()):
+        records = list_records(target)
+        expected = {"afdb": 25, "ltafdb": 84}.get(physionet_id)
+        missing = [rec for rec in records if not (target / f"{rec}.atr").is_file()
+                   or (physionet_id == "afdb" and not (target / f"{rec}.qrs").is_file())]
+        if not records or missing or (expected is not None and len(records) != expected):
+            raise RuntimeError(
+                f"Téléchargement incomplet dans {target} : {len(records)} enregistrements, "
+                f"{expected} attendus ; annotations manquantes : {missing}. "
+                "Les fichiers existants sont conservés ; compléter la base avant de continuer."
+            )
         return target
     wfdb.dl_database(physionet_id, dl_dir=str(target))
     return target

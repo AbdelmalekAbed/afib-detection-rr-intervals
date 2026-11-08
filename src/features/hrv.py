@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 
+FEATURE_VERSION = "hrv_v2_probability_entropy"
+
 
 def rmssd(rr: np.ndarray) -> float:
     if len(rr) < 2:
@@ -23,10 +25,11 @@ def pnn50(rr: np.ndarray) -> float:
 
 
 def shannon_entropy(rr: np.ndarray, bins: int = 16) -> float:
+    """Discrete histogram entropy, in nats (not an entropy of densities)."""
     if len(rr) == 0:
         return 0.0
-    hist, _ = np.histogram(rr, bins=bins, density=True)
-    p = hist[hist > 0]
+    hist, _ = np.histogram(rr, bins=bins)
+    p = hist[hist > 0].astype(np.float64) / hist.sum()
     return float(-(p * np.log(p)).sum())
 
 

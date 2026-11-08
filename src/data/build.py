@@ -24,12 +24,14 @@ def build_windows(
     min_rr: float = 0.3,
     max_rr: float = 2.0,
     verbose: bool = False,
+    strict: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Retourne ``(X, y, patient_ids)`` pour un répertoire PhysioNet téléchargé.
 
-    Les enregistrements illisibles ou trop courts sont ignorés ; leur nombre est
-    signalé si ``verbose`` est vrai, afin qu'une base partiellement téléchargée
-    ne passe pas inaperçue.
+    En mode strict (défaut), un enregistrement illisible arrête la construction.
+    Les enregistrements trop courts sont ignorés ; leur nombre est signalé si
+    ``verbose`` est vrai. ``strict=False`` autorise explicitement les exclusions
+    de fichiers illisibles pour une exploration, pas pour une expérience finale.
     """
     dataset_dir = Path(dataset_dir)
     if not dataset_dir.is_dir():
@@ -44,6 +46,8 @@ def build_windows(
             meta = load_record_metadata(dataset_dir, rec)
             series = clean_rr_series(extract_rr_series(meta), min_rr=min_rr, max_rr=max_rr)
         except Exception as exc:  # enregistrement corrompu ou incomplet
+            if strict:
+                raise RuntimeError(f"Enregistrement {rec} illisible dans {dataset_dir}.") from exc
             skipped.append(f"{rec} ({exc})")
             continue
         if len(series.rr_seconds) >= window:
