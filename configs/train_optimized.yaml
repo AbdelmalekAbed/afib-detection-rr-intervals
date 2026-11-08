@@ -1,0 +1,35 @@
+# Optimization budget declared before running outer test evaluation.
+defaults:
+  data: configs/data.yaml
+  model: configs/model_cnn_lstm.yaml
+
+training:
+  seed: 42
+  epochs: 16
+  batch_size: 512
+  optimizer:
+    name: adamw
+    lr: 0.001
+    weight_decay: 0.0001
+  loss:
+    name: bce_with_logits
+    pos_weight: auto
+  early_stopping:
+    monitor: val_auroc
+    patience: 3
+    mode: max
+
+evaluation:
+  decision_threshold: 0.5
+
+logging:
+  out_dir: artifacts
+
+protocol:
+  name: nested_patient_cv_optimized_v2
+  search_space: optimized_v2
+  objective_metric: calibrated_patient_f1
+  inner_splits: 3
+  trials: 8
+  startup_trials: 4
+  parameter_budget: 100000
